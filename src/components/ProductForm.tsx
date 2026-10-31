@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { searchProductCatalog } from '../services/productCatalog';
+import { searchProductCatalog, CATALOG_PAGE_SIZE } from '../services/productCatalog';
 import type { CatalogProduct } from '../services/productCatalog';
 import type { Category, Product, Unit } from '../models/types';
 import { CATEGORIES, UNITS } from '../models/types';
@@ -31,7 +31,7 @@ export function ProductForm({ product, initialDraft, onSubmit, onCancel }: Produ
     try {
       const found = await searchProductCatalog(catalogQuery, nextPage);
       setCatalogPage(nextPage);
-      setCatalogHasMore(!/^\d{8,14}$/.test(catalogQuery.trim()) && found.length >= 75);
+      setCatalogHasMore(!/^\d{8,14}$/.test(catalogQuery.trim()) && found.length >= CATALOG_PAGE_SIZE);
       setCatalogResults((previous) => nextPage === 1 ? found : [...previous, ...found.filter((item) => !previous.some((saved) => saved.barcode === item.barcode))]);
       if (!found.length) setCatalogMessage(nextPage === 1 ? 'Nessun prodotto trovato: puoi inserirlo manualmente qui sotto.' : 'Non ci sono altri risultati.');
     } catch {
@@ -51,7 +51,7 @@ export function ProductForm({ product, initialDraft, onSubmit, onCancel }: Produ
     {error && <div className="form-error">{error}</div>}
     {!product && <section className="catalog-search" aria-label="Catalogo alimentare online">
       <strong>Cerca nel catalogo alimentare</strong>
-      <p>Cerca alimenti di qualsiasi marca, per nome o EAN: latte, pasta, yogurt, merendine, bevande e molto altro. Non serve la fotocamera.</p>
+      <p>Cerca prodotti alimentari di tutte le marche, per nome o codice EAN: latte, pasta, yogurt, merendine, bevande, surgelati, conserve e molto altro. Fino a 150 risultati per pagina. Non serve la fotocamera.</p>
       <div className="catalog-search-row"><input aria-label="Nome o marca da cercare" value={catalogQuery} onChange={(event) => setCatalogQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void searchCatalog(1); } }} placeholder="Nome, marca o EAN (es. Barilla)" /><button className="button secondary" type="button" disabled={catalogQuery.trim().length < 2 || catalogLoading} onClick={() => void searchCatalog(1)}>{catalogLoading ? 'Ricerca…' : 'Cerca'}</button></div>
       {catalogMessage && <p role="status">{catalogMessage}</p>}
       {catalogResults.length > 0 && <div className="catalog-results" aria-label="Risultati catalogo">{catalogResults.map((item) => <button type="button" className="catalog-result" key={item.barcode} onClick={() => chooseCatalogProduct(item)}><span><strong>{item.name}</strong><small>{item.brand}{item.format ? ` · ${item.format}` : ''}</small><small>EAN: {item.barcode}</small></span><span>Seleziona</span></button>)}</div>}
