@@ -1,4 +1,4 @@
-/* global self, caches, fetch, URL */
+/* global self, caches, fetch, URL, Response */
 const CACHE = 'smartfridge-shell-v3';
 const BASE = new URL(self.registration.scope).pathname;
 const SHELL = [BASE, `${BASE}manifest.webmanifest`, `${BASE}icon.svg`];
