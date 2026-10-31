@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Camera, Keyboard, RefreshCw, X, Zap } from 'lucide-react';
 import { validBarcode } from './barcodeValidation';
+import { scannerSound, unlockScannerSound } from './scannerSounds';
 
 interface BarcodeScannerProps { mode: 'entrata' | 'uscita'; demo?: boolean; onCode: (code: string) => void; onClose: () => void; }
 
@@ -8,11 +9,15 @@ export function BarcodeScanner({ mode, demo = false, onCode, onClose }: BarcodeS
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<{ stop: () => void } | null>(null);
   const scanLocked = useRef(false);
+  const soundEnabled = useRef(false);
+  const lastValidRead = useRef(Date.now());
+  const lastErrorBeep = useRef(0);
   const lastRead = useRef({ code: '', timestamp: 0, count: 0 });
   const acceptCodeRef = useRef<(raw: string, manual?: boolean) => void>(() => {});
   const onCodeRef = useRef(onCode);
   onCodeRef.current = onCode;
   const [manualCode, setManualCode] = useState('');
+  const [soundReady, setSoundReady] = useState(false);
   const [cameraError, setCameraError] = useState('');
   const [cameraName, setCameraName] = useState('Fotocamera anteriore');
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
@@ -23,9 +28,10 @@ export function BarcodeScanner({ mode, demo = false, onCode, onClose }: BarcodeS
     const code = raw.trim().replace(/\s+/g, '');
     if (scanLocked.current) return;
     if (!validBarcode(code)) {
-      if (manual) setCameraError('EAN/UPC non valido: controlla le cifre e il numero di controllo.');
+      if (manual) { setCameraError('EAN/UPC non valido: controlla le cifre e il numero di controllo.'); if (soundEnabled.current) scannerSound('error'); }
       return;
     }
+    lastValidRead.current = Date.now();
     if (!manual) {
       const previous = lastRead.current;
       const now = Date.now();
@@ -34,6 +40,7 @@ export function BarcodeScanner({ mode, demo = false, onCode, onClose }: BarcodeS
       if (count < 2) { setStatus('Codice rilevato, tieni fermo un istante…'); return; }
     }
     scanLocked.current = true;
+    if (soundEnabled.current) scannerSound('success');
     controlsRef.current?.stop();
     if (navigator.vibrate) navigator.vibrate(80);
     onCodeRef.current(code);
@@ -89,11 +96,34 @@ export function BarcodeScanner({ mode, demo = false, onCode, onClose }: BarcodeS
     setDeviceId(devices[(index + 1) % devices.length].deviceId);
   };
 
+  useEffect(() => {
+    if (simulated) return;
+    const timer = window.setInterval(() => {
+      if (scanLocked.current || cameraError || !soundEnabled.current || !controlsRef.current) return;
+      const now = Date.now();
+      if (now - lastValidRead.current >= 7000 && now - lastErrorBeep.current >= 12000) {
+        lastErrorBeep.current = now;
+        scannerSound('error');
+        setStatus('Codice non letto: migliora la luce o prova a spostare la confezione.');
+      }
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [simulated, cameraError]);
+
+  const enableSound = async () => {
+    const ready = await unlockScannerSound();
+    soundEnabled.current = ready;
+    setSoundReady(ready);
+    if (ready) scannerSound('success');
+    else setCameraError('Il browser non ha attivato l’audio. Controlla le impostazioni e riprova.');
+  };
+
   const submitManual = (event: React.FormEvent) => { event.preventDefault(); acceptCode(manualCode, true); };
   return <div className="scanner-overlay"><div className="scanner-panel">
     <header className="scanner-header"><div><span className="eyebrow">Modalità {mode === 'entrata' ? 'entrata' : 'uscita'}</span><h2><Camera size={23} /> Scanner EAN</h2></div><button className="icon-button" onClick={onClose} aria-label="Chiudi scanner"><X /></button></header>
     <div className={`scanner-viewport ${simulated ? 'simulated' : ''}`}>{simulated ? <div className="simulated-scanner"><Zap size={46} /><strong>Scanner simulato</strong><span>Seleziona un codice demo per provare il flusso.</span></div> : <><video ref={videoRef} muted playsInline autoPlay /><div className="scan-frame" /><div className="scanner-caption" role="status">{status}</div></>}</div>
     <div className="scanner-toolbar">
+      <button type="button" className="button secondary" onClick={() => void enableSound()}>{soundReady ? "Audio attivo ✓" : "Attiva segnali audio"}</button>
       {devices.length > 1 && !simulated && <button type="button" className="button secondary" onClick={nextCamera}><RefreshCw size={16} /> Cambia fotocamera</button>}
       <span className="camera-label">{cameraName}</span>
       {demo && <button className="button secondary" onClick={() => setSimulated((value) => !value)}><Zap size={16} /> {simulated ? 'Scansione reale' : 'Demo'}</button>}
