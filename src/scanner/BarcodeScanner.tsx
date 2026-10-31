@@ -8,7 +8,7 @@ export function BarcodeScanner({ mode, demo = false, onCode, onClose }: BarcodeS
   const controlsRef = useRef<{ stop: () => void } | null>(null);
   const [manualCode, setManualCode] = useState('');
   const [cameraError, setCameraError] = useState('');
-  const [cameraName, setCameraName] = useState('Camera posteriore');
+  const [cameraName, setCameraName] = useState('Fotocamera anteriore');
   const [simulated, setSimulated] = useState(demo);
 
   useEffect(() => {
@@ -19,8 +19,8 @@ export function BarcodeScanner({ mode, demo = false, onCode, onClose }: BarcodeS
         const { BrowserMultiFormatReader } = await import('@zxing/browser');
         const reader = new BrowserMultiFormatReader();
         const devices = await BrowserMultiFormatReader.listVideoInputDevices();
-        const preferred = devices.find((device) => /back|rear|environment|post/i.test(device.label)) ?? devices[0];
-        if (preferred) setCameraName(preferred.label || 'Camera disponibile');
+        const preferred = devices.find((device) => /front|user|face|anteriore|facetime/i.test(device.label)) ?? devices.find((device) => !/back|rear|environment|post/i.test(device.label)) ?? devices[0];
+        if (preferred) setCameraName(preferred.label || 'Fotocamera anteriore (preferita)');
         if (!preferred || cancelled || !videoRef.current) throw new Error('Nessuna fotocamera disponibile.');
         controlsRef.current = await reader.decodeFromVideoDevice(preferred.deviceId, videoRef.current, (result) => { if (result) onCode(result.getText()); });
       } catch (error) {
