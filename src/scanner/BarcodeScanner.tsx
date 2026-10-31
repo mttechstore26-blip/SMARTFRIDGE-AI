@@ -9,6 +9,7 @@ export function BarcodeScanner({ mode, demo = false, onCode, onClose }: BarcodeS
   const controlsRef = useRef<{ stop: () => void } | null>(null);
   const scanLocked = useRef(false);
   const lastRead = useRef({ code: '', timestamp: 0, count: 0 });
+  const acceptCodeRef = useRef<(raw: string, manual?: boolean) => void>(() => {});
   const onCodeRef = useRef(onCode);
   onCodeRef.current = onCode;
   const [manualCode, setManualCode] = useState('');
@@ -38,6 +39,8 @@ export function BarcodeScanner({ mode, demo = false, onCode, onClose }: BarcodeS
     onCodeRef.current(code);
   };
 
+  acceptCodeRef.current = acceptCode;
+
   useEffect(() => {
     if (simulated || !videoRef.current) return;
     let cancelled = false;
@@ -57,7 +60,7 @@ export function BarcodeScanner({ mode, demo = false, onCode, onClose }: BarcodeS
           ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
           : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } };
         activeControls = await reader.decodeFromConstraints(constraints, videoRef.current!, (result) => {
-          if (result && !cancelled) acceptCode(result.getText());
+          if (result && !cancelled) acceptCodeRef.current(result.getText());
         });
         if (cancelled) { activeControls.stop(); return; }
         controlsRef.current = activeControls;
