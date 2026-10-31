@@ -3,10 +3,21 @@ import type { BackupPayload } from '../models/types';
 
 const KEY = 'smartfridge-sync-config';
 const AUTO_KEY = 'smartfridge-sync-auto';
+const BASELINE_KEY = 'smartfridge-sync-baseline';
 export type SyncConfig = { endpoint: string; token: string; revision: number };
 export type AutoSyncResult = 'inizializzato' | 'aggiornato' | 'inviato' | 'nessuna-modifica';
 
 let baseline: string | null = null;
+function readBaseline(config: SyncConfig): string | null {
+  try {
+    const saved = JSON.parse(localStorage.getItem(BASELINE_KEY) ?? 'null') as { endpoint: string; value: string } | null;
+    return saved?.endpoint === config.endpoint ? saved.value : null;
+  } catch { return null; }
+}
+function storeBaseline(config: SyncConfig, value: string) {
+  baseline = value;
+  localStorage.setItem(BASELINE_KEY, JSON.stringify({ endpoint: config.endpoint, value }));
+}
 let busy = false;
 
 function fingerprint(payload: BackupPayload): string {
@@ -25,7 +36,6 @@ export function isAutoSyncEnabled(): boolean {
 }
 export function setAutoSyncEnabled(enabled: boolean) {
   localStorage.setItem(AUTO_KEY, enabled ? 'yes' : 'no');
-  baseline = null;
 }
 export function configureSync(endpoint: string, token: string) {
   const url = new URL(endpoint);
@@ -34,7 +44,7 @@ export function configureSync(endpoint: string, token: string) {
   const normalized = url.origin + url.pathname.replace(/\/$/, '');
   const config: SyncConfig = { endpoint: normalized, token: token.trim(), revision: previous?.endpoint === normalized && previous.token === token.trim() ? previous.revision : 0 };
   sessionStorage.setItem(KEY, JSON.stringify(config));
-  baseline = null;
+  baseline = readBaseline(config);
 }
 async function request(config: SyncConfig, method: 'GET' | 'PUT', body?: unknown) {
   const response = await fetch(config.endpoint + '/api/snapshot', {
@@ -58,7 +68,7 @@ export async function uploadSnapshot() {
     const payload = await createBackup();
     const result = await request(config, 'PUT', { revision: config.revision, payload });
     sessionStorage.setItem(KEY, JSON.stringify({ ...config, revision: result.revision }));
-    baseline = fingerprint(payload);
+    storeBaseline(config, fingerprint(payload));
   } finally { busy = false; }
 }
 export async function downloadSnapshot() {
@@ -71,7 +81,7 @@ export async function downloadSnapshot() {
     if (!remote.payload || !validateBackup(remote.payload)) throw new Error('Il server non contiene ancora un backup valido.');
     await restoreBackup(remote.payload);
     sessionStorage.setItem(KEY, JSON.stringify({ ...config, revision: remote.revision }));
-    baseline = fingerprint(remote.payload);
+    storeBaseline(config, fingerprint(remote.payload));
   } finally { busy = false; }
 }
 
@@ -88,6 +98,7 @@ export async function autoSyncOnce(): Promise<AutoSyncResult> {
   if (busy) return 'nessuna-modifica';
   busy = true;
   try {
+    if (baseline === null) baseline = readBaseline(config);
     const local = await createBackup();
     const localHash = fingerprint(local);
     const remote = await request(config, 'GET');
@@ -100,7 +111,7 @@ export async function autoSyncOnce(): Promise<AutoSyncResult> {
       if (localHash !== remoteHash) {
         throw new Error('Inventari diversi: scegli manualmente Invia o Scarica dopo aver esportato un backup.');
       }
-      baseline = localHash;
+      storeBaseline(config, localHash);
       sessionStorage.setItem(KEY, JSON.stringify({ ...config, revision: remote.revision }));
       return 'inizializzato';
     }
@@ -112,13 +123,13 @@ export async function autoSyncOnce(): Promise<AutoSyncResult> {
     if (remoteChanged) {
       if (localChanged) throw new Error('Modifiche concorrenti. Sincronizzazione sospesa.');
       await restoreBackup(remote.payload);
-      baseline = remoteHash;
+      storeBaseline(config, remoteHash);
       sessionStorage.setItem(KEY, JSON.stringify({ ...config, revision: remote.revision }));
       return 'aggiornato';
     }
     if (localChanged) {
       const result = await request(config, 'PUT', { revision: remote.revision, payload: local });
-      baseline = localHash;
+      storeBaseline(config, localHash);
       sessionStorage.setItem(KEY, JSON.stringify({ ...config, revision: result.revision }));
       return 'inviato';
     }
