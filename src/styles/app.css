@@ -166,3 +166,21 @@ h2 { font-size: 19px; }
 .product-photo-upload input { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; }
 .product-photo-remove { padding: 8px; color: var(--coral); background: transparent; font-size: 12px; }
 @media (max-width: 480px) { .product-photo-preview { flex-basis: 86px; width: 86px; height: 86px; } .product-photo-layout { gap: 10px; } }
+
+/* iPadOS installed web app: honor screen-safe regions when browser chrome disappears. */
+@supports (padding: max(0px)) {
+  @media (display-mode: standalone) {
+    body { padding-top: env(safe-area-inset-top, 0px); }
+    .app-shell { min-height: calc(100dvh - env(safe-area-inset-top, 0px)); }
+    .topbar { min-height: 64px; }
+    .standby-screen { padding-top: env(safe-area-inset-top, 0px); }
+  }
+  @media (display-mode: standalone) and (max-width: 760px) {
+    .sidebar {
+      height: calc(68px + env(safe-area-inset-bottom, 0px));
+      padding-bottom: calc(7px + env(safe-area-inset-bottom, 0px));
+    }
+    .page-content { padding-bottom: calc(94px + env(safe-area-inset-bottom, 0px)); }
+    .toast { bottom: calc(82px + env(safe-area-inset-bottom, 0px)); }
+  }
+}
