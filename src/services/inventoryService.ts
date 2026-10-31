@@ -50,6 +50,13 @@ function removeFromLots(lots: Lot[], amount: number): LotChange[] {
   return changes;
 }
 
+// Keep the per-product movement order unambiguous even when two actions occur in the same millisecond.
+async function movementTimestamp(productId: string): Promise<string> {
+  const timestamps = (await db.movements.where('productId').equals(productId).toArray()).map((entry) => Date.parse(entry.timestamp)).filter(Number.isFinite);
+  const mostRecent = timestamps.length ? Math.max(...timestamps) : 0;
+  return new Date(Math.max(Date.now(), mostRecent + 1)).toISOString();
+}
+
 function reverseLotChanges(lots: Lot[], changes: LotChange[], timestamp: string) {
   for (const change of changes) {
     const lot = lots.find((item) => item.id === change.lotId);
@@ -81,8 +88,8 @@ export async function updateProduct(id: string, changes: Partial<ProductDraft>):
   if (!current) throw new Error('Prodotto non trovato.');
   const next = { ...current, ...changes, barcode: normalizeBarcode(changes.barcode ?? current.barcode) };
   validateDraft(next); await assertBarcodeAvailable(next.barcode, id);
-  const timestamp = now();
   return db.transaction('rw', db.products, db.movements, async () => {
+    const timestamp = await movementTimestamp(id);
     const lots = seedLots(current);
     const lotChanges: LotChange[] = [];
     const delta = next.quantity - current.quantity;
@@ -104,7 +111,7 @@ export async function adjustQuantity(id: string, delta: number, method: Movement
   if (!Number.isFinite(delta) || delta === 0) throw new Error('La variazione deve essere diversa da zero.');
   return db.transaction('rw', db.products, db.movements, async () => {
     const current = await db.products.get(id); if (!current) throw new Error('Prodotto non trovato.');
-    const timestamp = now(); const lots = seedLots(current); const lotChanges: LotChange[] = [];
+    const timestamp = await movementTimestamp(id); const lots = seedLots(current); const lotChanges: LotChange[] = [];
     if (delta > 0) { const lot = { id: uid('lot'), quantity: delta, expiryDate: current.expiryDate, createdAt: timestamp }; lots.push(lot); lotChanges.push({ lotId: lot.id, quantity: delta, expiryDate: lot.expiryDate, action: 'add' }); }
     if (delta < 0) lotChanges.push(...removeFromLots(lots, Math.abs(delta)));
     const updated: Product = { ...current, quantity: sumLots(normalizeLots(lots)), lots: normalizeLots(lots), expiryDate: earliestExpiry(lots) ?? current.expiryDate, updatedAt: timestamp };
@@ -120,7 +127,7 @@ export async function undoMovement(movementId: string): Promise<Product> {
     const product = await db.products.get(movement.productId); if (!product) throw new Error('Prodotto non trovato.');
     const history = (await db.movements.where('productId').equals(product.id).toArray()).filter((item) => !item.undone && item.type !== 'annullamento').sort((a, b) => b.timestamp.localeCompare(a.timestamp));
     if (history[0]?.id !== movement.id) throw new Error('Puoi annullare solo l’ultimo movimento del prodotto.');
-    const timestamp = now(); const lots = seedLots(product); if (movement.lotChanges) reverseLotChanges(lots, movement.lotChanges, timestamp);
+    const timestamp = await movementTimestamp(product.id); const lots = seedLots(product); if (movement.lotChanges) reverseLotChanges(lots, movement.lotChanges, timestamp);
     const restored: Product = { ...product, quantity: movement.previousQuantity, lots: normalizeLots(lots), expiryDate: earliestExpiry(lots) ?? product.expiryDate, updatedAt: timestamp };
     await db.products.put(restored); await db.movements.update(movementId, { undone: true });
     await db.movements.add({ id: uid('movement'), productId: product.id, productName: product.name, type: 'annullamento', quantity: movement.quantity, method: 'manuale', timestamp, previousQuantity: product.quantity, nextQuantity: restored.quantity });
