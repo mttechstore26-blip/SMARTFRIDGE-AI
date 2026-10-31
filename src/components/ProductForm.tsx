@@ -17,18 +17,22 @@ export function ProductForm({ product, onSubmit, onCancel }: ProductFormProps) {
   const [catalogQuery, setCatalogQuery] = useState('');
   const [catalogResults, setCatalogResults] = useState<CatalogProduct[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogPage, setCatalogPage] = useState(1);
+  const [catalogHasMore, setCatalogHasMore] = useState(false);
   const [catalogMessage, setCatalogMessage] = useState('');
   const [lastSearch, setLastSearch] = useState(0);
-  const searchCatalog = async () => {
+  const searchCatalog = async (nextPage = 1) => {
     if (catalogQuery.trim().length < 2 || catalogLoading) return;
     if (Date.now() - lastSearch < 6500) { setCatalogMessage('Attendi qualche secondo prima di cercare ancora.'); return; }
     setLastSearch(Date.now());
     setCatalogLoading(true);
     setCatalogMessage('');
     try {
-      const found = await searchProductCatalog(catalogQuery);
-      setCatalogResults(found);
-      if (!found.length) setCatalogMessage('Nessun prodotto trovato: puoi inserirlo manualmente qui sotto.');
+      const found = await searchProductCatalog(catalogQuery, nextPage);
+      setCatalogPage(nextPage);
+      setCatalogHasMore(!/^\d{8,14}$/.test(catalogQuery.trim()) && found.length >= 75);
+      setCatalogResults((previous) => nextPage === 1 ? found : [...previous, ...found.filter((item) => !previous.some((saved) => saved.barcode === item.barcode))]);
+      if (!found.length) setCatalogMessage(nextPage === 1 ? 'Nessun prodotto trovato: puoi inserirlo manualmente qui sotto.' : 'Non ci sono altri risultati.');
     } catch {
       setCatalogResults([]);
       setCatalogMessage('Ricerca online non disponibile. Puoi comunque inserire il prodotto manualmente.');
@@ -46,10 +50,11 @@ export function ProductForm({ product, onSubmit, onCancel }: ProductFormProps) {
     {error && <div className="form-error">{error}</div>}
     {!product && <section className="catalog-search" aria-label="Catalogo alimentare online">
       <strong>Cerca nel catalogo alimentare</strong>
-      <p>Scrivi un prodotto o una marca (es. Kinder Bueno, Barilla, Galbani). Non serve la fotocamera.</p>
-      <div className="catalog-search-row"><input aria-label="Nome o marca da cercare" value={catalogQuery} onChange={(event) => setCatalogQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void searchCatalog(); } }} placeholder="Cerca per nome o marca" /><button className="button secondary" type="button" disabled={catalogQuery.trim().length < 2 || catalogLoading} onClick={() => void searchCatalog()}>{catalogLoading ? 'Ricerca…' : 'Cerca'}</button></div>
+      <p>Cerca alimenti di qualsiasi marca, per nome o EAN: latte, pasta, yogurt, merendine, bevande e molto altro. Non serve la fotocamera.</p>
+      <div className="catalog-search-row"><input aria-label="Nome o marca da cercare" value={catalogQuery} onChange={(event) => setCatalogQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void searchCatalog(1); } }} placeholder="Nome, marca o EAN (es. Barilla)" /><button className="button secondary" type="button" disabled={catalogQuery.trim().length < 2 || catalogLoading} onClick={() => void searchCatalog(1)}>{catalogLoading ? 'Ricerca…' : 'Cerca'}</button></div>
       {catalogMessage && <p role="status">{catalogMessage}</p>}
       {catalogResults.length > 0 && <div className="catalog-results" aria-label="Risultati catalogo">{catalogResults.map((item) => <button type="button" className="catalog-result" key={item.barcode} onClick={() => chooseCatalogProduct(item)}><span><strong>{item.name}</strong><small>{item.brand}{item.format ? ` · ${item.format}` : ''}</small><small>EAN: {item.barcode}</small></span><span>Seleziona</span></button>)}</div>}
+      {catalogHasMore && catalogResults.length > 0 && <button type="button" className="button secondary" disabled={catalogLoading} onClick={() => void searchCatalog(catalogPage + 1)}>{catalogLoading ? 'Caricamento…' : 'Mostra altri prodotti'}</button>}
       <small>Fonte: Open Food Facts. Controlla EAN e formato sulla confezione. I risultati vengono salvati temporaneamente per l'uso offline.</small>
     </section>}
     <div className="form-grid">
