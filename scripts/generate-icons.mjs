@@ -1,4 +1,4 @@
-/* global Buffer */
+/* global Buffer, URL */
 import { deflateSync } from 'node:zlib';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
