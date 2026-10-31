@@ -3,11 +3,11 @@ import type { Product, ShoppingItem } from '../models/types';
 import { normalize, now, uid } from '../utils/helpers';
 
 export function getAutomaticSuggestions(products: Product[]): ShoppingItem[] {
-  return products.filter((product) => product.quantity <= product.minQuantity).map((product) => ({
+  return products.filter((product) => product.quantity <= product.minQuantity && product.targetQuantity > product.quantity).map((product) => ({
     id: `auto_${product.id}`,
     productId: product.id,
     name: product.name,
-    quantity: Math.max(1, product.targetQuantity - product.quantity),
+    quantity: product.targetQuantity - product.quantity,
     unit: product.unit,
     source: 'automatico',
     purchased: false,
