@@ -48,6 +48,7 @@ export default function App() {
   const [commandText, setCommandText] = useState('');
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const voiceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastActivity = useRef(Date.now());
   const [standby, setStandby] = useState(false);
 
@@ -146,9 +147,58 @@ export default function App() {
     } catch (error) { notify(error instanceof Error ? error.message : 'Comando non eseguito.', 'error'); }
   };
   const startListening = () => {
+    if (listening) {
+      recognitionRef.current?.stop();
+      if (voiceTimeoutRef.current) clearTimeout(voiceTimeoutRef.current);
+      voiceTimeoutRef.current = null;
+      setListening(false);
+      return;
+    }
     const recognition = getSpeechRecognition();
-    if (!recognition) { notify('Il riconoscimento vocale non è supportato da questo browser. Usa il campo testuale.', 'info'); return; }
-    recognition.lang = 'it-IT'; recognition.interimResults = false; recognition.continuous = false; recognition.onresult = (event) => { const text = event.results[0]?.[0]?.transcript ?? ''; setListening(false); void executeCommand(text); }; recognition.onerror = () => { setListening(false); notify('Non ho sentito il comando. Riprova con il microfono vicino.', 'error'); }; recognition.onend = () => setListening(false); recognitionRef.current = recognition; recognition.start(); setListening(true);
+    if (!recognition) {
+      notify('Riconoscimento vocale non disponibile su questo browser. Puoi usare il comando scritto.', 'info');
+      return;
+    }
+    const finish = () => {
+      if (voiceTimeoutRef.current) clearTimeout(voiceTimeoutRef.current);
+      voiceTimeoutRef.current = null;
+      setListening(false);
+    };
+    recognition.lang = 'it-IT';
+    recognition.interimResults = false;
+    recognition.continuous = false;
+    recognition.onresult = (event) => {
+      finish();
+      const transcript = event.results[0]?.[0]?.transcript?.trim();
+      if (transcript) void executeCommand(transcript);
+      else notify('Non ho ricevuto parole riconosciute. Riprova oppure scrivi il comando.', 'info');
+    };
+    recognition.onerror = (event) => {
+      finish();
+      const code = (event as Event & { error?: string }).error;
+      const reason = code === 'not-allowed' || code === 'service-not-allowed'
+        ? 'Microfono o riconoscimento vocale non autorizzato: controlla i permessi di Safari.'
+        : code === 'network'
+          ? 'Il servizio vocale non è raggiungibile. Controlla la connessione Internet.'
+          : code === 'no-speech'
+            ? 'Nessuna voce rilevata. Avvicinati al microfono e riprova.'
+            : 'Il riconoscimento vocale non ha funzionato su questo dispositivo. Prova a scrivere il comando.';
+      notify(reason, 'error');
+    };
+    recognition.onend = finish;
+    recognitionRef.current = recognition;
+    try {
+      recognition.start();
+      setListening(true);
+      voiceTimeoutRef.current = setTimeout(() => {
+        recognition.stop();
+        finish();
+        notify('Nessuna risposta dal riconoscimento vocale. Su iPad Air 2 Safari potrebbe non supportarlo correttamente: usa il comando scritto.', 'error');
+      }, 12000);
+    } catch {
+      finish();
+      notify('Impossibile avviare il microfono su Safari. Controlla i permessi del sito.', 'error');
+    }
   };
   const addManualShopping = async () => { const name = window.prompt('Cosa vuoi aggiungere alla lista?'); if (!name) return; await addShoppingItem(name, 1); await refresh(); notify(`${name} aggiunto alla lista.`); };
   const purchaseManual = async (item: ShoppingItem) => { await toggleShoppingItem(item); await refresh(); notify(item.purchased ? 'Articolo riaperto.' : `${item.name} segnato come acquistato.`); };
