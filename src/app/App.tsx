@@ -256,7 +256,7 @@ export default function App() {
       const code = (event as Event & { error?: string }).error;
       notify(
         code === 'not-allowed' || code === 'service-not-allowed'
-          ? 'Microfono non autorizzato: verifica i permessi di Safari.'
+          ? ((window.matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone) ? 'Riconoscimento vocale bloccato nella web app installata. Controlla Impostazioni iPad > Privacy e sicurezza > Microfono e Riconoscimento vocale. Se Safari funziona ma qui no, usa il comando vocale da Safari: iPadOS potrebbe non supportarlo in questa modalità.' : 'Microfono o riconoscimento vocale non autorizzato: controlla i permessi del sito in Safari e il riconoscimento vocale nelle impostazioni iPad.')
           : code === 'network'
             ? 'Safari non raggiunge il servizio di riconoscimento vocale.'
             : code === 'no-speech'
