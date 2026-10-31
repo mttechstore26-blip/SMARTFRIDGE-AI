@@ -50,7 +50,7 @@ export function BarcodeScanner({ mode, demo = false, onCode, onClose }: BarcodeS
         const { BrowserMultiFormatReader } = await import('@zxing/browser');
         const { DecodeHintType, BarcodeFormat } = await import('@zxing/library');
         const hints = new Map();
-        hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E]);
+        hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A]);
         hints.set(DecodeHintType.TRY_HARDER, true);
         const reader = new BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 180, delayBetweenScanSuccess: 300 });
         const constraints: MediaStreamConstraints = { audio: false, video: deviceId
