@@ -19,7 +19,7 @@ def connect():
     return db
 
 class Handler(BaseHTTPRequestHandler):
-    def headers(self, status=200):
+    def send_json_headers(self, status=200):
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Access-Control-Allow-Origin", ORIGIN)
@@ -30,7 +30,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def reply(self, status, value):
-        self.headers(status)
+        self.send_json_headers(status)
         self.wfile.write(json.dumps(value).encode("utf-8"))
 
     def allowed(self):
@@ -42,7 +42,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         if not self.allowed():
             return self.reply(403, {"error": "Origin not allowed"})
-        self.headers(204)
+        self.send_json_headers(204)
 
     def do_GET(self):
         if self.path != "/api/snapshot" or not self.allowed():
