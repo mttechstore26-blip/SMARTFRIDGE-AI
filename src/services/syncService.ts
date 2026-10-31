@@ -8,7 +8,7 @@ export function getSyncConfig(): SyncConfig | null {
 export function configureSync(endpoint: string, token: string) {
   const url = new URL(endpoint);
   if (url.protocol !== 'https:' || !token.trim()) throw new Error('Serve un indirizzo HTTPS e una chiave di accesso.');
-  const config: SyncConfig = { endpoint: url.origin + url.pathname.replace(/\\/$/, ''), token: token.trim(), revision: 0 };
+  const config: SyncConfig = { endpoint: url.origin + url.pathname.replace(/\/$/, ''), token: token.trim(), revision: 0 };
   sessionStorage.setItem(KEY, JSON.stringify(config));
 }
 async function request(config: SyncConfig, method: 'GET' | 'PUT', body?: unknown) {
