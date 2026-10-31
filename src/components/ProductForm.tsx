@@ -60,7 +60,7 @@ export function ProductForm({ product, initialDraft, onSubmit, onCancel }: Produ
     try {
       const found = await searchProductCatalog(query, nextPage);
       setCatalogPage(nextPage);
-      setCatalogHasMore(!/^\\d{8,14}$/.test(query) && found.length >= CATALOG_PAGE_SIZE);
+      setCatalogHasMore(!/^\d{8,14}$/.test(query) && found.length >= CATALOG_PAGE_SIZE);
       setCatalogResults((previous) => {
         const all = nextPage === 1 ? [...personal, ...found] : [...previous, ...found];
         const unique = new Map<string, CatalogProduct>();
