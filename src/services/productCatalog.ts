@@ -1,8 +1,11 @@
-import { categoryFromName } from '../utils/helpers';
+import { categoryFromName, normalize } from '../utils/helpers';
+import { db } from '../database/db';
+import type { Product } from '../models/types';
 import type { Category } from '../models/types';
 
 export interface CatalogProduct {
   barcode: string;
+  source?: 'personal' | 'online';
   name: string;
   brand: string;
   format: string;
@@ -19,6 +22,45 @@ type OFFProduct = {
   image_front_small_url?: string;
   countries_tags?: string[];
 };
+
+
+const personalCatalogKey = 'smartfridge-personal-catalog-v1';
+
+function personalEntry(product: Product): CatalogProduct {
+  return { barcode: product.barcode ?? '', name: product.name, brand: product.brand ?? '', category: product.category, format: '', image: product.image, source: 'personal' };
+}
+function catalogIdentity(product: CatalogProduct): string {
+  return product.barcode || normalize(product.name) + '|' + normalize(product.brand);
+}
+function savedPersonalCatalog(): CatalogProduct[] {
+  try {
+    const items: unknown = JSON.parse(localStorage.getItem(personalCatalogKey) ?? '[]');
+    if (!Array.isArray(items)) return [];
+    return items.filter((item): item is CatalogProduct => Boolean(item && typeof item.name === 'string' && item.name.trim() && typeof item.barcode === 'string' && typeof item.category === 'string')).slice(-1000);
+  } catch { return []; }
+}
+/** Remember validated products after a successful save; never uploads them to the public catalog. */
+export function rememberPersonalProduct(product: Product) {
+  try {
+    const entry = personalEntry(product);
+    const previous = savedPersonalCatalog().filter((item) => catalogIdentity(item) !== catalogIdentity(entry));
+    localStorage.setItem(personalCatalogKey, JSON.stringify([...previous, entry].slice(-1000)));
+  } catch { /* Saved inventory remains authoritative if browser storage is unavailable. */ }
+}
+/** Local and synchronized-inventory products are always searchable, including without Internet. */
+export async function searchPersonalCatalog(term: string): Promise<CatalogProduct[]> {
+  const query = normalize(term);
+  if (query.length < 2) return [];
+  const inventory = (await db.products.toArray()).map(personalEntry);
+  const unique = new Map<string, CatalogProduct>();
+  for (const item of [...inventory, ...savedPersonalCatalog()]) {
+    if (normalize(item.name + ' ' + item.brand + ' ' + item.barcode).includes(query)) {
+      const identity = catalogIdentity(item);
+      if (!unique.has(identity)) unique.set(identity, item);
+    }
+  }
+  return [...unique.values()].sort((a, b) => a.name.localeCompare(b.name, 'it'));
+}
 
 const prefix = 'smartfridge-catalog-v3:';
 export const CATALOG_PAGE_SIZE = 150;
