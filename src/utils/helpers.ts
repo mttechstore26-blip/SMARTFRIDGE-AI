@@ -23,12 +23,18 @@ export const categoryFromName = (name: string): Category => {
   if (/acqua|succo|bibita/.test(text)) return 'Bevande';
   return 'Altro';
 };
+export const getProductExpiry = (product: Product): string | undefined => {
+  if (product.quantity <= 0) return undefined;
+  const datedLots = product.lots.filter((lot) => lot.quantity > 0 && lot.expiryDate).map((lot) => lot.expiryDate as string);
+  if (datedLots.length) return datedLots.sort()[0];
+  return product.expiryDate;
+};
 export const productNeedsShopping = (product: Product) => product.quantity <= product.minQuantity;
 export const getDashboardStats = (products: Product[], expiryNoticeDays: number): DashboardStats => ({
   totalProducts: products.reduce((total, product) => total + product.quantity, 0),
   lowStock: products.filter((product) => product.quantity > 0 && productNeedsShopping(product)).length,
   outOfStock: products.filter((product) => product.quantity === 0).length,
-  expiringSoon: products.filter((product) => daysUntil(product.expiryDate) <= expiryNoticeDays).length
+  expiringSoon: products.filter((product) => daysUntil(getProductExpiry(product)) <= expiryNoticeDays).length
 });
 export const toCsv = (rows: Record<string, string | number | boolean>[]) => {
   if (!rows.length) return '';
