@@ -1,6 +1,6 @@
 export type SpeechResultEvent = { results: ArrayLike<(ArrayLike<{ transcript: string }> & { isFinal: boolean })> };
 export type SpeechRecognitionConstructor = new () => SpeechRecognition;
-export type SpeechRecognition = { lang: string; interimResults: boolean; continuous: boolean; onresult: ((event: SpeechResultEvent) => void) | null; onerror: ((event: Event) => void) | null; onend: (() => void) | null; start: () => void; stop: () => void };
+export type SpeechRecognition = { lang: string; interimResults: boolean; continuous: boolean; onresult: ((event: SpeechResultEvent) => void) | null; onerror: ((event: Event) => void) | null; onend: (() => void) | null; onspeechend: (() => void) | null; start: () => void; stop: () => void };
 
 declare global { interface Window { webkitSpeechRecognition?: SpeechRecognitionConstructor; SpeechRecognition?: SpeechRecognitionConstructor; } }
 
