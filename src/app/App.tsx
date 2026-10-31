@@ -148,10 +148,12 @@ export default function App() {
   };
   const startListening = () => {
     if (listening) {
-      recognitionRef.current?.stop();
+      const active = recognitionRef.current;
+      recognitionRef.current = null;
       if (voiceTimeoutRef.current) clearTimeout(voiceTimeoutRef.current);
       voiceTimeoutRef.current = null;
       setListening(false);
+      active?.stop();
       return;
     }
     const recognition = getSpeechRecognition();
@@ -159,21 +161,29 @@ export default function App() {
       notify('Riconoscimento vocale non disponibile su questo browser. Puoi usare il comando scritto.', 'info');
       return;
     }
+    let completed = false;
     const finish = () => {
       if (voiceTimeoutRef.current) clearTimeout(voiceTimeoutRef.current);
       voiceTimeoutRef.current = null;
+      if (recognitionRef.current === recognition) recognitionRef.current = null;
       setListening(false);
     };
     recognition.lang = 'it-IT';
     recognition.interimResults = false;
     recognition.continuous = false;
     recognition.onresult = (event) => {
-      finish();
+      if (completed) return;
+      completed = true;
       const transcript = event.results[0]?.[0]?.transcript?.trim();
+      // Stop the microphone before processing commands or speaking the reply.
+      finish();
+      recognition.stop();
       if (transcript) void executeCommand(transcript);
       else notify('Non ho ricevuto parole riconosciute. Riprova oppure scrivi il comando.', 'info');
     };
     recognition.onerror = (event) => {
+      if (completed) return;
+      completed = true;
       finish();
       const code = (event as Event & { error?: string }).error;
       const reason = code === 'not-allowed' || code === 'service-not-allowed'
@@ -185,17 +195,24 @@ export default function App() {
             : 'Il riconoscimento vocale non ha funzionato su questo dispositivo. Prova a scrivere il comando.';
       notify(reason, 'error');
     };
-    recognition.onend = finish;
+    recognition.onend = () => {
+      if (completed) return;
+      completed = true;
+      finish();
+    };
     recognitionRef.current = recognition;
     try {
       recognition.start();
       setListening(true);
       voiceTimeoutRef.current = setTimeout(() => {
-        recognition.stop();
+        if (completed) return;
+        completed = true;
         finish();
-        notify('Nessuna risposta dal riconoscimento vocale. Su iPad Air 2 Safari potrebbe non supportarlo correttamente: usa il comando scritto.', 'error');
+        recognition.stop();
+        notify('Nessuna risposta dal riconoscimento vocale. Riprova oppure scrivi il comando.', 'error');
       }, 12000);
     } catch {
+      completed = true;
       finish();
       notify('Impossibile avviare il microfono su Safari. Controlla i permessi del sito.', 'error');
     }
