@@ -100,3 +100,43 @@ h2 { font-size: 19px; }
 .catalog-result strong { font-size: 12px; }
 .catalog-result small { font-size: 10px; color: var(--muted); }
 .catalog-result > span:last-child { color: var(--brand); font-size: 11px; font-weight: 700; }
+
+/* iPad Air 2 (768x1024 portrait, 1024x768 landscape) and comparable tablets.
+   CSS viewport pixels, not the 2048x1536 physical panel resolution. */
+@media (min-width: 761px) and (max-width: 1100px) and (pointer: coarse) {
+  .app-shell { min-height: 100dvh; }
+  .sidebar { width: 176px; flex: 0 0 176px; padding: 20px 10px 14px; }
+  .sidebar-brand { padding: 0 3px 20px; }
+  .main-nav button { min-height: 44px; }
+  .topbar { padding-left: 22px; padding-right: 22px; }
+  .page-content { padding: 24px 22px 36px; }
+  .hero-card { overflow: hidden; }
+  .dashboard-columns, .shopping-layout, .settings-grid { gap: 14px; }
+  .surface-card { min-width: 0; }
+  .settings-grid input, .settings-grid select { max-width: 100%; min-width: 0; }
+  .settings-actions { gap: 8px; }
+  .settings-actions button { min-height: 44px; white-space: normal; }
+  .product-row { min-width: 0; }
+  .round-action, .icon-button { min-width: 38px; min-height: 38px; }
+  .modal-card, .scanner-panel { max-height: min(88dvh, 840px); overflow-y: auto; }
+  .scanner-viewport { height: min(42dvh, 360px); }
+}
+@media (min-width: 761px) and (max-width: 850px) and (orientation: portrait) and (pointer: coarse) {
+  .sidebar { width: 154px; flex-basis: 154px; padding-left: 7px; padding-right: 7px; }
+  .brand-mark strong { font-size: 13px; }
+  .fridge-status { font-size: 10px; }
+  .topbar { padding-left: 17px; padding-right: 17px; }
+  .page-content { padding: 20px 16px 30px; }
+  .dashboard-columns, .shopping-layout, .settings-grid { grid-template-columns: minmax(0, 1fr); }
+  .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .settings-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hero-copy h1 { font-size: clamp(30px, 5vw, 42px); }
+  .page-header h1 { font-size: 29px; }
+  .product-row { gap: 7px; }
+  .product-stock { min-width: 60px; }
+  .row-actions { gap: 3px; }
+}
+@media (max-width: 1100px) and (pointer: coarse) {
+  button, input, select, textarea { touch-action: manipulation; }
+  input, select, textarea { font-size: max(16px, 1em); }
+}
