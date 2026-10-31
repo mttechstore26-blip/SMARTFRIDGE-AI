@@ -1,6 +1,7 @@
 /* global self, caches, fetch */
 const CACHE = 'smartfridge-shell-v1';
-const SHELL = ['/', '/manifest.webmanifest', '/icon.svg'];
+const BASE = new URL(self.registration.scope).pathname;
+const SHELL = [BASE, `${BASE}manifest.webmanifest`, `${BASE}icon.svg`];
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
   self.skipWaiting();
@@ -12,5 +13,5 @@ self.addEventListener('fetch', (event) => {
     const copy = response.clone();
     caches.open(CACHE).then((cache) => cache.put(event.request, copy));
     return response;
-  }).catch(() => caches.match('/'))));
+  }).catch(() => caches.match(BASE))));
 });
