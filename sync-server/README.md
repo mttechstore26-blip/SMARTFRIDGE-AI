@@ -4,7 +4,7 @@ Questo servizio è **opzionale**. La PWA continua a funzionare offline anche se 
 
 ## Requisiti
 - Python 3.10+, systemd e Nginx già installati
-- Dominio o sottodominio HTTPS per il servizio, ad esempio `sync.example.com`
+- Dominio o sottodominio HTTPS per il servizio, ad esempio `smartfridge-sync.207-180-244-108.sslip.io`
 - Porta applicativa 8765 **solo su 127.0.0.1**
 - Chiave casuale privata lunga almeno 32 byte, **mai committata su GitHub**
 
@@ -20,7 +20,7 @@ SMARTFRIDGE_DB_PATH=/var/lib/smartfridge/sync.sqlite3
 
 Creare un servizio systemd con `ExecStart=/usr/bin/python3 /opt/smartfridge-ai/sync-server/server.py`, `EnvironmentFile` puntato al file privato, `User` dedicato senza privilegi, `Restart=on-failure`, `WorkingDirectory=/opt/smartfridge-ai`. Verificare permessi di scrittura sulla directory SQLite.
 
-Configurare Nginx sul sottodominio HTTPS scelto con `proxy_pass http://127.0.0.1:8765;` e certificato TLS valido. Non esporre la porta 8765 direttamente. Aggiungere rate limiting e limiti di dimensione delle richieste al reverse proxy.
+Configurare Nginx sul sottodominio HTTPS smartfridge-sync.207-180-244-108.sslip.io con `proxy_pass http://127.0.0.1:8765;` e certificato TLS valido. Non esporre la porta 8765 direttamente. Aggiungere rate limiting e limiti di dimensione delle richieste al reverse proxy.
 
 ## Collegamento dell'app
 Aprire **Impostazioni → Tablet e smartphone** nella PWA, inserire l'indirizzo HTTPS e la chiave. Premere **Salva collegamento**. Per il primo dispositivo, esportare prima il backup JSON e poi scegliere **Invia inventario alla VPS**. Sul secondo dispositivo scegliere **Scarica inventario dalla VPS**, dopo aver salvato un backup locale.
