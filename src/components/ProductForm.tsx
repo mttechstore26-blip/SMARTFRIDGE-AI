@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { searchProductCatalog, CATALOG_PAGE_SIZE } from '../services/productCatalog';
+import { searchProductCatalog, searchPersonalCatalog, CATALOG_PAGE_SIZE } from '../services/productCatalog';
 import type { CatalogProduct } from '../services/productCatalog';
 import type { Category, Product, Unit } from '../models/types';
 import { CATEGORIES, UNITS } from '../models/types';
@@ -41,20 +41,39 @@ export function ProductForm({ product, initialDraft, onSubmit, onCancel }: Produ
   const [catalogMessage, setCatalogMessage] = useState('');
   const [lastSearch, setLastSearch] = useState(0);
   const searchCatalog = async (nextPage = 1) => {
-    if (catalogQuery.trim().length < 2 || catalogLoading) return;
-    if (Date.now() - lastSearch < 6500) { setCatalogMessage('Attendi qualche secondo prima di cercare ancora.'); return; }
+    const query = catalogQuery.trim();
+    if (query.length < 2 || catalogLoading) return;
+    // Personal entries are instant and searchable offline. Online lookup is optional.
+    const personal = nextPage === 1 ? await searchPersonalCatalog(query) : [];
+    if (nextPage === 1) {
+      setCatalogResults(personal);
+      setCatalogPage(1);
+      setCatalogHasMore(false);
+      setCatalogMessage(personal.length ? `${personal.length} prodotti del tuo catalogo personale trovati.` : '');
+    }
+    if (Date.now() - lastSearch < 6500) {
+      if (!personal.length) setCatalogMessage('Attendi qualche secondo prima della ricerca online.');
+      return;
+    }
     setLastSearch(Date.now());
     setCatalogLoading(true);
-    setCatalogMessage('');
     try {
-      const found = await searchProductCatalog(catalogQuery, nextPage);
+      const found = await searchProductCatalog(query, nextPage);
       setCatalogPage(nextPage);
-      setCatalogHasMore(!/^\d{8,14}$/.test(catalogQuery.trim()) && found.length >= CATALOG_PAGE_SIZE);
-      setCatalogResults((previous) => nextPage === 1 ? found : [...previous, ...found.filter((item) => !previous.some((saved) => saved.barcode === item.barcode))]);
-      if (!found.length) setCatalogMessage(nextPage === 1 ? 'Nessun prodotto trovato: puoi inserirlo manualmente qui sotto.' : 'Non ci sono altri risultati.');
+      setCatalogHasMore(!/^\\d{8,14}$/.test(query) && found.length >= CATALOG_PAGE_SIZE);
+      setCatalogResults((previous) => {
+        const all = nextPage === 1 ? [...personal, ...found] : [...previous, ...found];
+        const unique = new Map<string, CatalogProduct>();
+        for (const item of all) {
+          const key = item.barcode || `${item.name.toLocaleLowerCase('it')}|${item.brand.toLocaleLowerCase('it')}`;
+          if (!unique.has(key)) unique.set(key, item);
+        }
+        return [...unique.values()];
+      });
+      if (!found.length && !personal.length && nextPage === 1) setCatalogMessage('Nessun prodotto trovato: puoi inserirlo manualmente qui sotto.');
     } catch {
-      setCatalogResults([]);
-      setCatalogMessage('Ricerca online non disponibile. Puoi comunque inserire il prodotto manualmente.');
+      setCatalogHasMore(false);
+      setCatalogMessage(personal.length ? 'Prodotti personali disponibili. Ricerca online temporaneamente non disponibile.' : 'Ricerca online non disponibile. Puoi inserire il prodotto manualmente.');
     } finally { setCatalogLoading(false); }
   };
   const chooseCatalogProduct = (item: CatalogProduct) => {
@@ -80,12 +99,12 @@ export function ProductForm({ product, initialDraft, onSubmit, onCancel }: Produ
     </section>}
     {!product && <section className="catalog-search" aria-label="Catalogo alimentare online">
       <strong>Cerca nel catalogo alimentare</strong>
-      <p>Cerca prodotti alimentari di tutte le marche, per nome o codice EAN: latte, pasta, yogurt, merendine, bevande, surgelati, conserve e molto altro. Fino a 150 risultati per pagina. Non serve la fotocamera.</p>
+      <p>Trova prima i prodotti che hai già salvato, anche offline, oppure cerca alimenti di tutte le marche per nome o EAN: latte, pasta, yogurt, merendine, bevande, surgelati, conserve e molto altro. Fino a 150 risultati per pagina. Non serve la fotocamera.</p>
       <div className="catalog-search-row"><input aria-label="Nome o marca da cercare" value={catalogQuery} onChange={(event) => setCatalogQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void searchCatalog(1); } }} placeholder="Nome, marca o EAN (es. Barilla)" /><button className="button secondary" type="button" disabled={catalogQuery.trim().length < 2 || catalogLoading} onClick={() => void searchCatalog(1)}>{catalogLoading ? 'Ricerca…' : 'Cerca'}</button></div>
       {catalogMessage && <p role="status">{catalogMessage}</p>}
-      {catalogResults.length > 0 && <div className="catalog-results" aria-label="Risultati catalogo">{catalogResults.map((item) => <button type="button" className="catalog-result" key={item.barcode} onClick={() => chooseCatalogProduct(item)}><span><strong>{item.name}</strong><small>{item.brand}{item.format ? ` · ${item.format}` : ''}</small><small>EAN: {item.barcode}</small></span><span>Seleziona</span></button>)}</div>}
+      {catalogResults.length > 0 && <div className="catalog-results" aria-label="Risultati catalogo">{catalogResults.map((item) => <button type="button" className="catalog-result" key={item.barcode} onClick={() => chooseCatalogProduct(item)}><span><strong>{item.name}</strong><small>{item.brand}{item.format ? ` · ${item.format}` : ''}</small><small>{item.source === 'personal' ? 'Il tuo catalogo' : 'Open Food Facts'}{item.barcode ? ` · EAN: ${item.barcode}` : ' · Senza EAN'}</small></span><span>Seleziona</span></button>)}</div>}
       {catalogHasMore && catalogResults.length > 0 && <button type="button" className="button secondary" disabled={catalogLoading} onClick={() => void searchCatalog(catalogPage + 1)}>{catalogLoading ? 'Caricamento…' : 'Mostra altri prodotti'}</button>}
-      <small>Fonte: Open Food Facts. Controlla EAN e formato sulla confezione. I risultati vengono salvati temporaneamente per l'uso offline.</small>
+      <small>I prodotti che aggiungi vengono ricordati nel tuo catalogo personale; le schede presenti nell’inventario sono disponibili anche dopo la sincronizzazione. Open Food Facts resta una fonte esterna separata.</small>
     </section>}
     <div className="form-grid">
       <label className="field field-wide">Nome prodotto<input autoFocus value={draft.name} onChange={(event) => update('name', event.target.value)} placeholder="es. Latte intero" required /></label>
