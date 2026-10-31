@@ -49,7 +49,7 @@ export default function App() {
     const [nextProducts, nextMovements, nextShopping, nextSettings] = await Promise.all([getProducts(), getMovements(), getShoppingItems(), ensureSettings()]);
     setProducts(nextProducts); setMovements(nextMovements); setShopping(nextShopping); setSettings(nextSettings);
   }, []);
-  useEffect(() => { void refresh(); if ('serviceWorker' in navigator) void navigator.serviceWorker.register('/sw.js').catch(() => undefined); }, [refresh]);
+  useEffect(() => { void refresh(); if ('serviceWorker' in navigator) void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => undefined); }, [refresh]);
   useEffect(() => {
     const root = document.documentElement;
     const resolved = settings.theme === 'sistema' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'scuro' : 'chiaro') : settings.theme;
