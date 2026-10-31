@@ -62,14 +62,15 @@ export default function App() {
     let disposed = false;
     let running = false;
     const sync = async () => {
-      if (disposed || running || !navigator.onLine) return;
+      if (disposed || running) return;
+      if (!navigator.onLine) { setSyncStatus('Offline: controllo automatico in attesa della connessione.'); return; }
       running = true;
       try {
         const result = await autoSyncOnce();
         if (disposed) return;
         if (result === 'aggiornato') { await refresh(); setSyncStatus('Inventario aggiornato dalla VPS.'); }
         else if (result === 'inviato') setSyncStatus('Modifiche inviate alla VPS.');
-        else if (result === 'inizializzato') setSyncStatus('Sincronizzazione automatica attiva.');
+        else if (result === 'inizializzato' || result === 'nessuna-modifica') setSyncStatus('Sincronizzazione automatica attiva. Inventari allineati.');
       } catch (error) {
         if (!disposed) {
           const message = error instanceof Error ? error.message : 'Sincronizzazione non riuscita.';
