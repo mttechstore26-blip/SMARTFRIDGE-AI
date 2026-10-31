@@ -1,4 +1,5 @@
 let context: AudioContext | null = null;
+export function isScannerSoundReady(): boolean { return context?.state === 'running'; }
 
 /** iPadOS Safari requires an explicit tap to unlock synthesized audio. */
 export async function unlockScannerSound(): Promise<boolean> {
