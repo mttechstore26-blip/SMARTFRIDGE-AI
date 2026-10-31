@@ -7,12 +7,13 @@ import type { ProductDraft } from '../services/inventoryService';
 
 interface ProductFormProps {
   product?: Product;
+  initialDraft?: Partial<ProductDraft>;
   onSubmit: (draft: ProductDraft) => Promise<void> | void;
   onCancel: () => void;
 }
 
-export function ProductForm({ product, onSubmit, onCancel }: ProductFormProps) {
-  const [draft, setDraft] = useState<ProductDraft>({ barcode: product?.barcode ?? '', name: product?.name ?? '', brand: product?.brand ?? '', category: product?.category ?? 'Altro', image: product?.image ?? '', quantity: product?.quantity ?? 1, unit: product?.unit ?? 'pezzi', minQuantity: product?.minQuantity ?? 1, targetQuantity: product?.targetQuantity ?? 2, expiryDate: product?.expiryDate ?? '', notes: product?.notes ?? '' });
+export function ProductForm({ product, initialDraft, onSubmit, onCancel }: ProductFormProps) {
+  const [draft, setDraft] = useState<ProductDraft>({ barcode: product?.barcode ?? initialDraft?.barcode ?? '', name: product?.name ?? initialDraft?.name ?? '', brand: product?.brand ?? initialDraft?.brand ?? '', category: product?.category ?? initialDraft?.category ?? 'Altro', image: product?.image ?? initialDraft?.image ?? '', quantity: product?.quantity ?? 1, unit: product?.unit ?? 'pezzi', minQuantity: product?.minQuantity ?? 1, targetQuantity: product?.targetQuantity ?? 2, expiryDate: product?.expiryDate ?? '', notes: product?.notes ?? '' });
   const [error, setError] = useState('');
   const [catalogQuery, setCatalogQuery] = useState('');
   const [catalogResults, setCatalogResults] = useState<CatalogProduct[]>([]);
