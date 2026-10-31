@@ -164,9 +164,12 @@ export default function App() {
     let completed = false;
     let partialTimer: ReturnType<typeof setTimeout> | null = null;
     let latestTranscript = '';
+    let endingTimer: ReturnType<typeof setTimeout> | null = null;
     const finish = () => {
       if (partialTimer) clearTimeout(partialTimer);
       partialTimer = null;
+      if (endingTimer) clearTimeout(endingTimer);
+      endingTimer = null;
       if (voiceTimeoutRef.current) clearTimeout(voiceTimeoutRef.current);
       voiceTimeoutRef.current = null;
       if (recognitionRef.current === recognition) recognitionRef.current = null;
@@ -195,8 +198,19 @@ export default function App() {
       // Wait for a stable, supported command before closing the microphone.
       if (partialTimer) clearTimeout(partialTimer);
       if (parseCommand(text).intent !== 'unknown') {
-        partialTimer = setTimeout(() => accept(text), 1400);
+        // A short pause after the latest recognized words ends the command.
+        partialTimer = setTimeout(() => accept(text), 750);
       }
+    };
+    recognition.onspeechend = () => {
+      if (completed) return;
+      // Speech ended: request the final transcript rather than staying in listening mode.
+      try { recognition.stop(); } catch { /* Safari may have already stopped */ }
+      endingTimer = setTimeout(() => {
+        if (completed) return;
+        if (latestTranscript && parseCommand(latestTranscript).intent !== 'unknown') accept(latestTranscript);
+        else { completed = true; finish(); notify('Non ho capito la frase. Riprova.', 'info'); }
+      }, 1100);
     };
     recognition.onerror = (event) => {
       if (completed) return;
@@ -239,7 +253,7 @@ export default function App() {
         finish();
         try { recognition.stop(); } catch { /* Already stopped */ }
         notify('Non è arrivata alcuna frase riconosciuta. Controlla i permessi del microfono o usa il comando scritto.', 'error');
-      }, 25000);
+      }, 15000);
     } catch {
       completed = true;
       finish();
