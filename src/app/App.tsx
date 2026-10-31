@@ -15,6 +15,7 @@ import { rememberPersonalProduct } from '../services/productCatalog';
 import { findFoodImage } from '../services/productImages';
 import { addShoppingItem, getAutomaticSuggestions, getShoppingItems, deleteShoppingItem, toggleShoppingItem } from '../services/shoppingService';
 import { getSpeechRecognition, speakItalian, type SpeechRecognition } from '../voice/voiceService';
+import { startRemoteVoice, type CapturedVoice } from '../voice/remoteSpeech';
 import { parseCommand, commandHelp, findVoiceProduct } from '../voice/voiceParser';
 import { categoryFromName, daysUntil, formatDate, formatDateTime, formatQuantity, getDashboardStats, getProductExpiry, normalize } from '../utils/helpers';
 import '../styles/app.css';
@@ -50,6 +51,7 @@ export default function App() {
   const [toast, setToast] = useState<{ message: string; tone?: 'success' | 'error' | 'info' } | null>(null);
   const [commandText, setCommandText] = useState('');
   const [listening, setListening] = useState(false);
+  const remoteVoiceRef = useRef<CapturedVoice | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const voiceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastActivity = useRef(Date.now());
@@ -198,7 +200,33 @@ export default function App() {
     }
   };
   const isInstalledApp = window.matchMedia('(display-mode: standalone)').matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
+  const startInstalledVoice = async () => {
+    if (remoteVoiceRef.current) {
+      remoteVoiceRef.current.stop();
+      remoteVoiceRef.current = null;
+      setListening(false);
+      notify('Registrazione terminata, trascrizione in corso…', 'info');
+      return;
+    }
+    const config = getSyncConfig();
+    if (!config?.token || !config.endpoint) {
+      notify('Per i comandi vocali nell’app installata, configura prima il collegamento HTTPS alla VPS nelle Impostazioni.', 'info');
+      return;
+    }
+    try {
+      const capture = await startRemoteVoice(config.endpoint, config.token,
+        text => { setListening(false); void executeCommand(text); },
+        message => { setListening(false); notify(message, 'error'); }
+      );
+      remoteVoiceRef.current = capture;
+      setListening(true);
+      notify('Parla ora. Tocca di nuovo il microfono quando hai finito.', 'info');
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Impossibile registrare dal microfono.', 'error');
+    }
+  };
   const startListening = () => {
+    if (isInstalledApp) { void startInstalledVoice(); return; }
     if (listening) {
       const current = recognitionRef.current;
       recognitionRef.current = null;
