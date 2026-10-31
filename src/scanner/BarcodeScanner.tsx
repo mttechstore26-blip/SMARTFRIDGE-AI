@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Camera, Keyboard, RefreshCw, X, Zap } from 'lucide-react';
 import { validBarcode } from './barcodeValidation';
-import { scannerSound, unlockScannerSound } from './scannerSounds';
+import { isScannerSoundReady, scannerSound, unlockScannerSound } from './scannerSounds';
 
 interface BarcodeScannerProps { mode: 'entrata' | 'uscita'; demo?: boolean; onCode: (code: string) => void; onClose: () => void; }
 
@@ -9,7 +9,7 @@ export function BarcodeScanner({ mode, demo = false, onCode, onClose }: BarcodeS
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<{ stop: () => void } | null>(null);
   const scanLocked = useRef(false);
-  const soundEnabled = useRef(false);
+  const soundEnabled = useRef(isScannerSoundReady());
   const lastValidRead = useRef(Date.now());
   const lastErrorBeep = useRef(0);
   const lastRead = useRef({ code: '', timestamp: 0, count: 0 });
@@ -17,7 +17,7 @@ export function BarcodeScanner({ mode, demo = false, onCode, onClose }: BarcodeS
   const onCodeRef = useRef(onCode);
   onCodeRef.current = onCode;
   const [manualCode, setManualCode] = useState('');
-  const [soundReady, setSoundReady] = useState(false);
+  const [soundReady, setSoundReady] = useState(isScannerSoundReady);
   const [cameraError, setCameraError] = useState('');
   const [cameraName, setCameraName] = useState('Fotocamera anteriore');
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
