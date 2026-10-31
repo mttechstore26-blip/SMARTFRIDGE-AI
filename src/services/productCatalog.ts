@@ -20,14 +20,15 @@ type OFFProduct = {
   countries_tags?: string[];
 };
 
-const prefix = 'smartfridge-catalog-v2:';
+const prefix = 'smartfridge-catalog-v3:';
+export const CATALOG_PAGE_SIZE = 150;
 const fields = 'code,product_name_it,product_name,brands,quantity,image_front_small_url,countries_tags';
 const cacheDuration = 7 * 86400000;
 
 function toCatalogProduct(product: OFFProduct): CatalogProduct | undefined {
   const barcode = (product.code ?? '').trim();
   const name = (product.product_name_it || product.product_name || '').trim();
-  if (!/^\\d{8,14}$/.test(barcode) || !name) return undefined;
+  if (!/^\d{8,14}$/.test(barcode) || !name) return undefined;
   return {
     barcode,
     name,
@@ -60,7 +61,7 @@ export async function searchProductCatalog(term: string, page = 1): Promise<Cata
   const cached = getCache(key);
   if (cached) return cached;
 
-  const isBarcode = /^\\d{8,14}$/.test(query);
+  const isBarcode = /^\d{8,14}$/.test(query);
   if (isBarcode) {
     const response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${query}.json?fields=${fields}`, {
       headers: { Accept: 'application/json' }
@@ -79,7 +80,7 @@ export async function searchProductCatalog(term: string, page = 1): Promise<Cata
     action: 'process',
     json: '1',
     page: String(safePage),
-    page_size: '75',
+    page_size: String(CATALOG_PAGE_SIZE),
     sort_by: 'unique_scans_n',
     fields
   });
