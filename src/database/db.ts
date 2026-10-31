@@ -22,6 +22,14 @@ export class SmartFridgeDB extends Dexie {
       shopping: 'id, productId, purchased',
       settings: 'id'
     });
+    // IndexedDB schema migration: preserve existing data and add the index
+    // required by getShoppingItems(). Dexie upgrades existing databases to v3.
+    this.version(3).stores({
+      products: 'id, &barcode, category, updatedAt',
+      movements: 'id, productId, timestamp',
+      shopping: 'id, productId, purchased, createdAt',
+      settings: 'id'
+    });
   }
 }
 
