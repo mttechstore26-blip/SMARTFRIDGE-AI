@@ -35,6 +35,7 @@ export function ProductForm({ product, initialDraft, onSubmit, onCancel }: Produ
   const [draft, setDraft] = useState<ProductDraft>({ barcode: product?.barcode ?? initialDraft?.barcode ?? '', name: product?.name ?? initialDraft?.name ?? '', brand: product?.brand ?? initialDraft?.brand ?? '', category: product?.category ?? initialDraft?.category ?? 'Altro', image: product?.image ?? initialDraft?.image ?? '', quantity: product?.quantity ?? 1, unit: product?.unit ?? 'pezzi', minQuantity: product?.minQuantity ?? 1, targetQuantity: product?.targetQuantity ?? 2, expiryDate: product?.expiryDate ?? '', notes: product?.notes ?? '' });
   const [error, setError] = useState('');
   const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoRemoved, setPhotoRemoved] = useState(false);
   const [photoMessage, setPhotoMessage] = useState('');
   const [catalogQuery, setCatalogQuery] = useState('');
   const [catalogResults, setCatalogResults] = useState<CatalogProduct[]>([]);
@@ -80,11 +81,12 @@ export function ProductForm({ product, initialDraft, onSubmit, onCancel }: Produ
     } finally { setCatalogLoading(false); }
   };
   const chooseCatalogProduct = (item: CatalogProduct) => {
-    setDraft((current) => ({ ...current, name: item.name, brand: item.brand, barcode: item.barcode, category: item.category, image: item.image ?? '' }));
+    setPhotoRemoved(false); setDraft((current) => ({ ...current, name: item.name, brand: item.brand, barcode: item.barcode, category: item.category, image: item.image ?? '' }));
     setCatalogResults([]);
     setCatalogMessage(`Selezionato: ${item.name}${item.format ? ` · ${item.format}` : ''}. Verifica la confezione e salva il prodotto.`);
   };
   const chooseFrequentProduct = (item: QuickProduct) => {
+    setPhotoRemoved(false);
     setDraft((current) => ({ ...current, name: item.name, brand: item.brand ?? '', category: item.category, barcode: '', image: '', quantity: 1, unit: item.unit ?? 'confezioni', expiryDate: '', notes: item.notes ?? '' }));
     setCatalogMessage('Prodotto frequente selezionato. Verifica la confezione, aggiungi eventuale EAN e scadenza, poi salva.');
     setCatalogResults([]);
@@ -94,19 +96,19 @@ export function ProductForm({ product, initialDraft, onSubmit, onCancel }: Produ
     setPhotoBusy(true); setPhotoMessage('Ricerca della foto in corso…');
     try {
       const image = await findFoodImage(draft.name, draft.brand, draft.barcode);
-      if (image) { setDraft((current) => ({ ...current, image })); setPhotoMessage('Foto trovata. Verifica che la confezione corrisponda.'); }
+      if (image) { setPhotoRemoved(false); setDraft((current) => ({ ...current, image })); setPhotoMessage('Foto trovata. Verifica che la confezione corrisponda.'); }
       else setPhotoMessage('Nessuna foto affidabile trovata: puoi caricarne una tua.');
     } finally { setPhotoBusy(false); }
   };
   const uploadPhoto = async (file?: File) => {
     if (!file) return;
     setPhotoBusy(true); setPhotoMessage('Preparazione foto…');
-    try { const image = await prepareFoodPhoto(file); setDraft((current) => ({ ...current, image })); setPhotoMessage('Foto pronta e compressa, sarà salvata con il prodotto.'); }
+    try { const image = await prepareFoodPhoto(file); setPhotoRemoved(false); setDraft((current) => ({ ...current, image })); setPhotoMessage('Foto pronta e compressa, sarà salvata con il prodotto.'); }
     catch (cause) { setPhotoMessage(cause instanceof Error ? cause.message : 'Impossibile caricare la foto.'); }
     finally { setPhotoBusy(false); }
   };
   const update = <K extends keyof ProductDraft>(key: K, value: ProductDraft[K]) => setDraft((current) => ({ ...current, [key]: value }));
-  const submit = async (event: React.FormEvent) => { event.preventDefault(); if (photoBusy) return; setError(''); setPhotoBusy(true); try { const image = draft.image || await findFoodImage(draft.name, draft.brand, draft.barcode); await onSubmit({ ...draft, image: image ?? '', quantity: Number(draft.quantity), minQuantity: Number(draft.minQuantity), targetQuantity: Number(draft.targetQuantity), barcode: draft.barcode || undefined, expiryDate: draft.expiryDate || undefined }); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Impossibile salvare il prodotto.'); } finally { setPhotoBusy(false); } };
+  const submit = async (event: React.FormEvent) => { event.preventDefault(); if (photoBusy) return; setError(''); setPhotoBusy(true); try { const image = draft.image || (photoRemoved ? undefined : await findFoodImage(draft.name, draft.brand, draft.barcode)); await onSubmit({ ...draft, image: image ?? '', quantity: Number(draft.quantity), minQuantity: Number(draft.minQuantity), targetQuantity: Number(draft.targetQuantity), barcode: draft.barcode || undefined, expiryDate: draft.expiryDate || undefined }); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Impossibile salvare il prodotto.'); } finally { setPhotoBusy(false); } };
   return <form className="product-form" onSubmit={submit}>
     <div className="form-heading"><div><span className="eyebrow">{product ? 'Modifica scheda' : 'Nuova scheda'}</span><h2>{product ? product.name : 'Aggiungi al frigo'}</h2></div><button type="button" className="icon-button" onClick={onCancel} aria-label="Chiudi">×</button></div>
     {error && <div className="form-error">{error}</div>}
@@ -134,7 +136,7 @@ export function ProductForm({ product, initialDraft, onSubmit, onCancel }: Produ
           <label className="product-photo-upload">Carica o scatta una foto
             <input type="file" accept="image/*" disabled={photoBusy} onChange={(event) => { const file = event.target.files?.[0]; void uploadPhoto(file); event.target.value = ''; }} />
           </label>
-          {draft.image && <button type="button" className="product-photo-remove" disabled={photoBusy} onClick={() => { setDraft((current) => ({ ...current, image: '' })); setPhotoMessage('Foto rimossa. Se non ne carichi un’altra, il salvataggio tenterà il recupero automatico.'); }}>Rimuovi foto</button>}
+          {draft.image && <button type="button" className="product-photo-remove" disabled={photoBusy} onClick={() => { setPhotoRemoved(true); setDraft((current) => ({ ...current, image: '' })); setPhotoMessage('Foto rimossa. Puoi salvare il prodotto senza immagine.'); }}>Rimuovi foto</button>}
         </div>
       </div>
       {photoMessage && <small role="status">{photoMessage}</small>}
