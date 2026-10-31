@@ -215,8 +215,8 @@ export default function App() {
     }
     try {
       const capture = await startRemoteVoice(config.endpoint, config.token,
-        text => { setListening(false); void executeCommand(text); },
-        message => { setListening(false); notify(message, 'error'); }
+        text => { remoteVoiceRef.current = null; setListening(false); void executeCommand(text); },
+        message => { remoteVoiceRef.current = null; setListening(false); notify(message, 'error'); }
       );
       remoteVoiceRef.current = capture;
       setListening(true);
