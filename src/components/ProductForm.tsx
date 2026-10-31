@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { findFoodImage, prepareFoodPhoto } from '../services/productImages';
 import { searchProductCatalog, searchPersonalCatalog, CATALOG_PAGE_SIZE } from '../services/productCatalog';
 import type { CatalogProduct } from '../services/productCatalog';
 import type { Category, Product, Unit } from '../models/types';
@@ -33,6 +34,8 @@ interface ProductFormProps {
 export function ProductForm({ product, initialDraft, onSubmit, onCancel }: ProductFormProps) {
   const [draft, setDraft] = useState<ProductDraft>({ barcode: product?.barcode ?? initialDraft?.barcode ?? '', name: product?.name ?? initialDraft?.name ?? '', brand: product?.brand ?? initialDraft?.brand ?? '', category: product?.category ?? initialDraft?.category ?? 'Altro', image: product?.image ?? initialDraft?.image ?? '', quantity: product?.quantity ?? 1, unit: product?.unit ?? 'pezzi', minQuantity: product?.minQuantity ?? 1, targetQuantity: product?.targetQuantity ?? 2, expiryDate: product?.expiryDate ?? '', notes: product?.notes ?? '' });
   const [error, setError] = useState('');
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoMessage, setPhotoMessage] = useState('');
   const [catalogQuery, setCatalogQuery] = useState('');
   const [catalogResults, setCatalogResults] = useState<CatalogProduct[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
@@ -86,8 +89,24 @@ export function ProductForm({ product, initialDraft, onSubmit, onCancel }: Produ
     setCatalogMessage('Prodotto frequente selezionato. Verifica la confezione, aggiungi eventuale EAN e scadenza, poi salva.');
     setCatalogResults([]);
   };
+  const findPhoto = async () => {
+    if (!draft.name.trim() && !draft.barcode?.trim()) { setPhotoMessage('Inserisci il nome o il codice a barre del prodotto.'); return; }
+    setPhotoBusy(true); setPhotoMessage('Ricerca della foto in corso…');
+    try {
+      const image = await findFoodImage(draft.name, draft.brand, draft.barcode);
+      if (image) { setDraft((current) => ({ ...current, image })); setPhotoMessage('Foto trovata. Verifica che la confezione corrisponda.'); }
+      else setPhotoMessage('Nessuna foto affidabile trovata: puoi caricarne una tua.');
+    } finally { setPhotoBusy(false); }
+  };
+  const uploadPhoto = async (file?: File) => {
+    if (!file) return;
+    setPhotoBusy(true); setPhotoMessage('Preparazione foto…');
+    try { const image = await prepareFoodPhoto(file); setDraft((current) => ({ ...current, image })); setPhotoMessage('Foto pronta e compressa, sarà salvata con il prodotto.'); }
+    catch (cause) { setPhotoMessage(cause instanceof Error ? cause.message : 'Impossibile caricare la foto.'); }
+    finally { setPhotoBusy(false); }
+  };
   const update = <K extends keyof ProductDraft>(key: K, value: ProductDraft[K]) => setDraft((current) => ({ ...current, [key]: value }));
-  const submit = async (event: React.FormEvent) => { event.preventDefault(); setError(''); try { await onSubmit({ ...draft, quantity: Number(draft.quantity), minQuantity: Number(draft.minQuantity), targetQuantity: Number(draft.targetQuantity), barcode: draft.barcode || undefined, expiryDate: draft.expiryDate || undefined }); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Impossibile salvare il prodotto.'); } };
+  const submit = async (event: React.FormEvent) => { event.preventDefault(); if (photoBusy) return; setError(''); setPhotoBusy(true); try { const image = draft.image || await findFoodImage(draft.name, draft.brand, draft.barcode); await onSubmit({ ...draft, image: image ?? '', quantity: Number(draft.quantity), minQuantity: Number(draft.minQuantity), targetQuantity: Number(draft.targetQuantity), barcode: draft.barcode || undefined, expiryDate: draft.expiryDate || undefined }); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Impossibile salvare il prodotto.'); } finally { setPhotoBusy(false); } };
   return <form className="product-form" onSubmit={submit}>
     <div className="form-heading"><div><span className="eyebrow">{product ? 'Modifica scheda' : 'Nuova scheda'}</span><h2>{product ? product.name : 'Aggiungi al frigo'}</h2></div><button type="button" className="icon-button" onClick={onCancel} aria-label="Chiudi">×</button></div>
     {error && <div className="form-error">{error}</div>}
@@ -102,10 +121,25 @@ export function ProductForm({ product, initialDraft, onSubmit, onCancel }: Produ
       <p>Trova prima i prodotti che hai già salvato, anche offline, oppure cerca alimenti di tutte le marche per nome o EAN: latte, pasta, yogurt, merendine, bevande, surgelati, conserve e molto altro. Fino a 150 risultati per pagina. Non serve la fotocamera.</p>
       <div className="catalog-search-row"><input aria-label="Nome o marca da cercare" value={catalogQuery} onChange={(event) => setCatalogQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void searchCatalog(1); } }} placeholder="Nome, marca o EAN (es. Barilla)" /><button className="button secondary" type="button" disabled={catalogQuery.trim().length < 2 || catalogLoading} onClick={() => void searchCatalog(1)}>{catalogLoading ? 'Ricerca…' : 'Cerca'}</button></div>
       {catalogMessage && <p role="status">{catalogMessage}</p>}
-      {catalogResults.length > 0 && <div className="catalog-results" aria-label="Risultati catalogo">{catalogResults.map((item) => <button type="button" className="catalog-result" key={item.barcode} onClick={() => chooseCatalogProduct(item)}><span><strong>{item.name}</strong><small>{item.brand}{item.format ? ` · ${item.format}` : ''}</small><small>{item.source === 'personal' ? 'Il tuo catalogo' : 'Open Food Facts'}{item.barcode ? ` · EAN: ${item.barcode}` : ' · Senza EAN'}</small></span><span>Seleziona</span></button>)}</div>}
+      {catalogResults.length > 0 && <div className="catalog-results" aria-label="Risultati catalogo">{catalogResults.map((item) => <button type="button" className="catalog-result" key={`${item.barcode || item.name + item.brand}-${item.source ?? "online"}`} onClick={() => chooseCatalogProduct(item)}><span><strong>{item.name}</strong><small>{item.brand}{item.format ? ` · ${item.format}` : ''}</small><small>{item.source === 'personal' ? 'Il tuo catalogo' : 'Open Food Facts'}{item.barcode ? ` · EAN: ${item.barcode}` : ' · Senza EAN'}</small></span><span>Seleziona</span></button>)}</div>}
       {catalogHasMore && catalogResults.length > 0 && <button type="button" className="button secondary" disabled={catalogLoading} onClick={() => void searchCatalog(catalogPage + 1)}>{catalogLoading ? 'Caricamento…' : 'Mostra altri prodotti'}</button>}
       <small>I prodotti che aggiungi vengono ricordati nel tuo catalogo personale; le schede presenti nell’inventario sono disponibili anche dopo la sincronizzazione. Open Food Facts resta una fonte esterna separata.</small>
     </section>}
+    <section className="product-photo-section" aria-label="Fotografia del prodotto">
+      <strong>Foto prodotto</strong>
+      <div className="product-photo-layout">
+        <div className="product-photo-preview">{draft.image ? <img src={draft.image} alt={`Foto di ${draft.name || 'prodotto'}`} /> : <span>Nessuna foto</span>}</div>
+        <div className="product-photo-controls">
+          <button className="button secondary" type="button" disabled={photoBusy} onClick={() => void findPhoto()}>{photoBusy ? 'Attendi…' : 'Cerca foto online'}</button>
+          <label className="product-photo-upload">Carica o scatta una foto
+            <input type="file" accept="image/*" disabled={photoBusy} onChange={(event) => { const file = event.target.files?.[0]; void uploadPhoto(file); event.target.value = ''; }} />
+          </label>
+          {draft.image && <button type="button" className="product-photo-remove" disabled={photoBusy} onClick={() => { setDraft((current) => ({ ...current, image: '' })); setPhotoMessage('Foto rimossa. Se non ne carichi un’altra, il salvataggio tenterà il recupero automatico.'); }}>Rimuovi foto</button>}
+        </div>
+      </div>
+      {photoMessage && <small role="status">{photoMessage}</small>}
+      <small>La ricerca usa Open Food Facts. Le foto caricate vengono ridimensionate e rimangono nel backup e nella sincronizzazione.</small>
+    </section>
     <div className="form-grid">
       <label className="field field-wide">Nome prodotto<input autoFocus value={draft.name} onChange={(event) => update('name', event.target.value)} placeholder="es. Latte intero" required /></label>
       <label className="field">Marca<input value={draft.brand} onChange={(event) => update('brand', event.target.value)} placeholder="Facoltativa" /></label>
@@ -118,6 +152,6 @@ export function ProductForm({ product, initialDraft, onSubmit, onCancel }: Produ
       <label className="field">Scadenza<input type="date" value={draft.expiryDate} onChange={(event) => update('expiryDate', event.target.value)} /></label>
       <label className="field field-wide">Note<textarea rows={2} value={draft.notes} onChange={(event) => update('notes', event.target.value)} placeholder="Lotto, preferenze, appunti…" /></label>
     </div>
-    <div className="form-actions"><button type="button" className="button secondary" onClick={onCancel}>Annulla</button><button type="submit" className="button primary">{product ? 'Salva modifiche' : 'Aggiungi prodotto'}</button></div>
+    <div className="form-actions"><button type="button" className="button secondary" onClick={onCancel}>Annulla</button><button type="submit" disabled={photoBusy} className="button primary">{product ? 'Salva modifiche' : 'Aggiungi prodotto'}</button></div>
   </form>;
 }
