@@ -58,7 +58,7 @@ export function BarcodeScanner({ mode, demo = false, onCode, onClose }: BarcodeS
         const reader = new BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 180, delayBetweenScanSuccess: 300 });
         const constraints: MediaStreamConstraints = { audio: false, video: deviceId
           ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
-          : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } };
+          : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } };
         activeControls = await reader.decodeFromConstraints(constraints, videoRef.current!, (result) => {
           if (result && !cancelled) acceptCodeRef.current(result.getText());
         });
