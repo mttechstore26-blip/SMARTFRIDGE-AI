@@ -72,9 +72,14 @@ export default function App() {
         else if (result === 'inizializzato') setSyncStatus('Sincronizzazione automatica attiva.');
       } catch (error) {
         if (!disposed) {
-          setAutoSyncEnabled(false);
-          setAutoSync(false);
-          setSyncStatus(error instanceof Error ? error.message : 'Sincronizzazione sospesa: verifica il collegamento.');
+          const message = error instanceof Error ? error.message : 'Sincronizzazione non riuscita.';
+          if (error instanceof TypeError || !navigator.onLine) {
+            setSyncStatus('Connessione assente: le modifiche restano sul dispositivo. Nuovo tentativo automatico.');
+          } else {
+            setAutoSyncEnabled(false);
+            setAutoSync(false);
+            setSyncStatus(message + ' Sincronizzazione automatica sospesa.');
+          }
         }
       } finally { running = false; }
     };
