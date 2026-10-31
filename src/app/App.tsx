@@ -148,57 +148,82 @@ export default function App() {
   };
   const startListening = () => {
     if (listening) {
-      const active = recognitionRef.current;
+      const current = recognitionRef.current;
       recognitionRef.current = null;
       if (voiceTimeoutRef.current) clearTimeout(voiceTimeoutRef.current);
       voiceTimeoutRef.current = null;
       setListening(false);
-      active?.stop();
+      current?.stop();
       return;
     }
     const recognition = getSpeechRecognition();
     if (!recognition) {
-      notify('Riconoscimento vocale non disponibile su questo browser. Puoi usare il comando scritto.', 'info');
+      notify('Il riconoscimento vocale non è disponibile. Usa il comando scritto.', 'info');
       return;
     }
     let completed = false;
+    let partialTimer: ReturnType<typeof setTimeout> | null = null;
+    let latestTranscript = '';
     const finish = () => {
+      if (partialTimer) clearTimeout(partialTimer);
+      partialTimer = null;
       if (voiceTimeoutRef.current) clearTimeout(voiceTimeoutRef.current);
       voiceTimeoutRef.current = null;
       if (recognitionRef.current === recognition) recognitionRef.current = null;
       setListening(false);
     };
+    const accept = (transcript: string) => {
+      if (completed) return;
+      completed = true;
+      finish();
+      // Stop listening before executing or reading the response out loud.
+      try { recognition.stop(); } catch { /* Safari may already have stopped */ }
+      void executeCommand(transcript);
+    };
     recognition.lang = 'it-IT';
-    recognition.interimResults = false;
+    recognition.interimResults = true;
     recognition.continuous = false;
     recognition.onresult = (event) => {
       if (completed) return;
-      completed = true;
-      const transcript = event.results[0]?.[0]?.transcript?.trim();
-      // Stop the microphone before processing commands or speaking the reply.
-      finish();
-      recognition.stop();
-      if (transcript) void executeCommand(transcript);
-      else notify('Non ho ricevuto parole riconosciute. Riprova oppure scrivi il comando.', 'info');
+      const results = Array.from(event.results);
+      const text = results.map((result) => result[0]?.transcript ?? '').join(' ').trim();
+      if (!text) return;
+      latestTranscript = text;
+      const final = results.every((result) => result.isFinal);
+      if (final) { accept(text); return; }
+      // Some older Safari builds only provide interim words for a long time.
+      // Wait for a stable, supported command before closing the microphone.
+      if (partialTimer) clearTimeout(partialTimer);
+      if (parseCommand(text).intent !== 'unknown') {
+        partialTimer = setTimeout(() => accept(text), 1400);
+      }
     };
     recognition.onerror = (event) => {
       if (completed) return;
       completed = true;
       finish();
       const code = (event as Event & { error?: string }).error;
-      const reason = code === 'not-allowed' || code === 'service-not-allowed'
-        ? 'Microfono o riconoscimento vocale non autorizzato: controlla i permessi di Safari.'
-        : code === 'network'
-          ? 'Il servizio vocale non è raggiungibile. Controlla la connessione Internet.'
-          : code === 'no-speech'
-            ? 'Nessuna voce rilevata. Avvicinati al microfono e riprova.'
-            : 'Il riconoscimento vocale non ha funzionato su questo dispositivo. Prova a scrivere il comando.';
-      notify(reason, 'error');
+      notify(
+        code === 'not-allowed' || code === 'service-not-allowed'
+          ? 'Microfono non autorizzato: verifica i permessi di Safari.'
+          : code === 'network'
+            ? 'Safari non raggiunge il servizio di riconoscimento vocale.'
+            : code === 'no-speech'
+              ? 'Nessuna voce rilevata. Riprova parlando vicino al microfono.'
+              : 'Riconoscimento vocale non riuscito. Riprova oppure scrivi il comando.',
+        'error'
+      );
     };
     recognition.onend = () => {
       if (completed) return;
+      // Safari may end after delivering only interim text.
+      if (latestTranscript && parseCommand(latestTranscript).intent !== 'unknown') {
+        accept(latestTranscript);
+        return;
+      }
       completed = true;
       finish();
+      notify('Ascolto terminato senza un comando riconosciuto. Riprova.', 'info');
     };
     recognitionRef.current = recognition;
     try {
@@ -206,15 +231,19 @@ export default function App() {
       setListening(true);
       voiceTimeoutRef.current = setTimeout(() => {
         if (completed) return;
+        if (latestTranscript && parseCommand(latestTranscript).intent !== 'unknown') {
+          accept(latestTranscript);
+          return;
+        }
         completed = true;
         finish();
-        recognition.stop();
-        notify('Nessuna risposta dal riconoscimento vocale. Riprova oppure scrivi il comando.', 'error');
-      }, 12000);
+        try { recognition.stop(); } catch { /* Already stopped */ }
+        notify('Non è arrivata alcuna frase riconosciuta. Controlla i permessi del microfono o usa il comando scritto.', 'error');
+      }, 25000);
     } catch {
       completed = true;
       finish();
-      notify('Impossibile avviare il microfono su Safari. Controlla i permessi del sito.', 'error');
+      notify('Impossibile avviare il microfono. Controlla i permessi del sito in Safari.', 'error');
     }
   };
   const addManualShopping = async () => { const name = window.prompt('Cosa vuoi aggiungere alla lista?'); if (!name) return; await addShoppingItem(name, 1); await refresh(); notify(`${name} aggiunto alla lista.`); };
