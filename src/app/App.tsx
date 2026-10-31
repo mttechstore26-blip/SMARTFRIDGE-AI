@@ -15,7 +15,7 @@ import { rememberPersonalProduct } from '../services/productCatalog';
 import { findFoodImage } from '../services/productImages';
 import { addShoppingItem, getAutomaticSuggestions, getShoppingItems, deleteShoppingItem, toggleShoppingItem } from '../services/shoppingService';
 import { getSpeechRecognition, speakItalian, type SpeechRecognition } from '../voice/voiceService';
-import { parseCommand, commandHelp } from '../voice/voiceParser';
+import { parseCommand, commandHelp, findVoiceProduct } from '../voice/voiceParser';
 import { categoryFromName, daysUntil, formatDate, formatDateTime, formatQuantity, getDashboardStats, getProductExpiry, normalize } from '../utils/helpers';
 import '../styles/app.css';
 
@@ -157,12 +157,25 @@ export default function App() {
     const parsed = parseCommand(raw); setCommandText('');
     try {
       if (parsed.intent === 'add' || parsed.intent === 'remove') {
-        const product = activeProducts.find((item) => normalize(item.name).includes(normalize(parsed.product)) || normalize(parsed.product).includes(normalize(item.name)));
-        if (!product) { if (parsed.intent === 'add' && !demoMode) { await createProduct({ name: parsed.product, category: categoryFromName(parsed.product), quantity: parsed.quantity, unit: 'pezzi', minQuantity: 1, targetQuantity: parsed.quantity + 1 }); await refresh(); notify(`${parsed.product} aggiunto al frigo.`); return; } throw new Error(`Non trovo “${parsed.product}” nell’inventario.`); }
+        const found = findVoiceProduct(parsed.product, activeProducts);
+        if (found.ambiguous) throw new Error(`Ci sono più prodotti simili a “${parsed.product}”. Usa il nome completo.`);
+        const product = found.product;
+        if (!product) {
+          if (parsed.intent === 'add' && !demoMode) {
+            const saved = await createProduct({ name: parsed.product, category: categoryFromName(parsed.product), quantity: parsed.quantity, unit: 'pezzi', minQuantity: 1, targetQuantity: parsed.quantity + 1 });
+            rememberPersonalProduct(saved);
+            await refresh();
+            const message = `${parsed.product}: aggiunti ${parsed.quantity} pezzi.`;
+            notify(message); speakItalian(message);
+            return;
+          }
+          throw new Error(`Non trovo “${parsed.product}” nell’inventario.`);
+        }
+        if (parsed.intent === 'remove' && parsed.quantity > product.quantity) throw new Error(`Sono disponibili solo ${formatQuantity(product.quantity, product.unit)} di ${product.name}.`);
         await adjust(product, parsed.intent === 'add' ? parsed.quantity : -parsed.quantity, 'voce');
         speakItalian(parsed.intent === 'add' ? `Ho aggiunto ${parsed.quantity} ${product.name}` : `Ho segnato ${parsed.quantity} ${product.name} come utilizzato`);
       } else if (parsed.intent === 'query') {
-        const match = parsed.product ? activeProducts.find((item) => normalize(item.name).includes(normalize(parsed.product ?? ''))) : undefined;
+        const match = parsed.product ? findVoiceProduct(parsed.product, activeProducts).product : undefined;
         const response = match ? `${match.name}: ${formatQuantity(match.quantity, match.unit)} disponibili.` : 'Non trovo questo prodotto.'; notify(response, match ? 'success' : 'error'); speakItalian(response);
       } else if (parsed.intent === 'shopping-add') { await addShoppingItem(parsed.product, parsed.quantity); await refresh(); notify(`${parsed.product} aggiunto alla lista.`); }
       else if (parsed.intent === 'shopping-list') { setTab('shopping'); const response = suggestions.length ? `Ci sono ${suggestions.length} prodotti da comprare.` : 'La lista è sotto controllo.'; notify(response, 'info'); speakItalian(response); }
