@@ -5,6 +5,24 @@ import type { Category, Product, Unit } from '../models/types';
 import { CATEGORIES, UNITS } from '../models/types';
 import type { ProductDraft } from '../services/inventoryService';
 
+
+type QuickProduct = { name: string; brand?: string; category: Category; unit?: Unit; notes?: string };
+const FREQUENT_PRODUCTS: QuickProduct[] = [
+  { name: 'Kinder Pingui', brand: 'Kinder', category: 'Latticini' },
+  { name: 'Muu Muu Mini Cioccolato 6 x 50 g', brand: 'cameo', category: 'Latticini', unit: 'confezioni' },
+  { name: 'Philadelphia senza lattosio', brand: 'Philadelphia', category: 'Latticini' },
+  { name: 'Sottilette senza lattosio', brand: 'Sottilette', category: 'Latticini' },
+  { name: 'Succo Yoga pesca', brand: 'Yoga', category: 'Bevande' },
+  { name: 'Prosciutto cotto', category: 'Carne e salumi' },
+  { name: 'Prosciutto crudo', category: 'Carne e salumi' },
+  { name: 'Salame', category: 'Carne e salumi' },
+  { name: 'Bresaola', category: 'Carne e salumi' },
+  { name: 'Fesa di tacchino affettata', category: 'Carne e salumi' },
+  { name: 'Speck', category: 'Carne e salumi' },
+  { name: 'Mortadella', category: 'Carne e salumi' },
+  { name: 'Affettati misti', category: 'Carne e salumi' }
+];
+
 interface ProductFormProps {
   product?: Product;
   initialDraft?: Partial<ProductDraft>;
@@ -44,12 +62,12 @@ export function ProductForm({ product, initialDraft, onSubmit, onCancel }: Produ
     setCatalogResults([]);
     setCatalogMessage(`Selezionato: ${item.name}${item.format ? ` · ${item.format}` : ''}. Verifica la confezione e salva il prodotto.`);
   };
-  const update = <K extends keyof ProductDraft>(key: K, value: ProductDraft[K]) => setDraft((current) => ({ ...current, [key]: value }));
+  const chooseFrequentProduct = (item: QuickProduct) => {\n    setDraft((current) => ({ ...current, name: item.name, brand: item.brand ?? '', category: item.category, barcode: '', image: '', quantity: 1, unit: item.unit ?? 'confezioni', expiryDate: '', notes: item.notes ?? '' }));\n    setCatalogMessage('Prodotto frequente selezionato. Verifica la confezione, aggiungi eventuale EAN e scadenza, poi salva.');\n    setCatalogResults([]);\n  };\n  const update = <K extends keyof ProductDraft>(key: K, value: ProductDraft[K]) => setDraft((current) => ({ ...current, [key]: value }));
   const submit = async (event: React.FormEvent) => { event.preventDefault(); setError(''); try { await onSubmit({ ...draft, quantity: Number(draft.quantity), minQuantity: Number(draft.minQuantity), targetQuantity: Number(draft.targetQuantity), barcode: draft.barcode || undefined, expiryDate: draft.expiryDate || undefined }); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Impossibile salvare il prodotto.'); } };
   return <form className="product-form" onSubmit={submit}>
     <div className="form-heading"><div><span className="eyebrow">{product ? 'Modifica scheda' : 'Nuova scheda'}</span><h2>{product ? product.name : 'Aggiungi al frigo'}</h2></div><button type="button" className="icon-button" onClick={onCancel} aria-label="Chiudi">×</button></div>
     {error && <div className="form-error">{error}</div>}
-    {!product && <section className="catalog-search" aria-label="Catalogo alimentare online">
+    {!product && <section className="frequent-products" aria-label="Prodotti acquistati spesso">\n      <strong>Prodotti acquistati spesso</strong>\n      <p>Tocca un prodotto per compilare la scheda. Per gli affettati scegli il tipo; puoi poi modificare la marca.</p>\n      <div className="frequent-products-grid">{FREQUENT_PRODUCTS.map((item) => <button type="button" className="frequent-product-button" key={item.name} onClick={() => chooseFrequentProduct(item)}>{item.name}</button>)}</div>\n      <small>Il prodotto viene aggiunto all'inventario solo quando premi “Aggiungi prodotto”. Codice a barre e scadenza non sono preimpostati.</small>\n    </section>}\n    {!product && <section className="catalog-search" aria-label="Catalogo alimentare online">
       <strong>Cerca nel catalogo alimentare</strong>
       <p>Cerca prodotti alimentari di tutte le marche, per nome o codice EAN: latte, pasta, yogurt, merendine, bevande, surgelati, conserve e molto altro. Fino a 150 risultati per pagina. Non serve la fotocamera.</p>
       <div className="catalog-search-row"><input aria-label="Nome o marca da cercare" value={catalogQuery} onChange={(event) => setCatalogQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void searchCatalog(1); } }} placeholder="Nome, marca o EAN (es. Barilla)" /><button className="button secondary" type="button" disabled={catalogQuery.trim().length < 2 || catalogLoading} onClick={() => void searchCatalog(1)}>{catalogLoading ? 'Ricerca…' : 'Cerca'}</button></div>
