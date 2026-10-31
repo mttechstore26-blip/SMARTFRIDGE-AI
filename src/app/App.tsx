@@ -11,6 +11,7 @@ import { createBackup, createInventoryCsv, downloadFile, restoreBackup } from '.
 import { adjustQuantity, createProduct, deleteProduct, getMovements, getProducts, undoMovement, updateProduct, type ProductDraft } from '../services/inventoryService';
 import { configureSync, getSyncConfig, uploadSnapshot, downloadSnapshot, autoSyncOnce, isAutoSyncEnabled, setAutoSyncEnabled } from '../services/syncService';
 import { lookupOpenFoodFacts } from '../services/openFoodFacts';
+import { rememberPersonalProduct } from '../services/productCatalog';
 import { addShoppingItem, getAutomaticSuggestions, getShoppingItems, deleteShoppingItem, toggleShoppingItem } from '../services/shoppingService';
 import { getSpeechRecognition, speakItalian, type SpeechRecognition } from '../voice/voiceService';
 import { parseCommand, commandHelp } from '../voice/voiceParser';
@@ -126,7 +127,7 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actionMode, activeProducts, demoMode]);
 
-  const saveProduct = async (draft: ProductDraft) => { if (editing) await updateProduct(editing.id, draft); else await createProduct(draft); await refresh(); setFormOpen(false); setEditing(undefined); setScannedDraft(undefined); notify(editing ? 'Scheda prodotto aggiornata.' : 'Prodotto aggiunto al frigo.'); };
+  const saveProduct = async (draft: ProductDraft) => { const saved = editing ? await updateProduct(editing.id, draft) : await createProduct(draft); rememberPersonalProduct(saved); await refresh(); setFormOpen(false); setEditing(undefined); setScannedDraft(undefined); notify(editing ? 'Scheda prodotto aggiornata.' : 'Prodotto aggiunto al frigo.'); };
   const removeProduct = async (product: Product) => { if (demoMode) { setDemoProducts((current) => current.filter((item) => item.id !== product.id)); notify('Prodotto rimosso solo dalla demo.'); return; } if (!window.confirm(`Eliminare ${product.name}?`)) return; await deleteProduct(product.id); await refresh(); notify('Prodotto eliminato.'); };
 
   const executeCommand = async (raw: string) => {
