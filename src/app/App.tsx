@@ -182,7 +182,7 @@ export default function App() {
         speakItalian(parsed.intent === 'add' ? `Ho aggiunto ${parsed.quantity} ${product.name}` : `Ho segnato ${parsed.quantity} ${product.name} come utilizzato`);
       } else if (parsed.intent === 'query') {
         const match = parsed.product ? findVoiceProduct(parsed.product, activeProducts).product : undefined;
-        const response = match ? `${match.name}: ${formatQuantity(match.quantity, match.unit)} disponibili.` : 'Non trovo questo prodotto.'; notify(response, match ? 'success' : 'error'); speakItalian(response);
+        const response = match ? `${match.name}: ${formatQuantity(match.quantity, match.unit)} disponibili.` : `Non trovo “${parsed.product || raw}” nell’inventario di questo dispositivo. Verifica il nome e la presenza del prodotto.`; notify(response, match ? 'success' : 'error'); speakItalian(match ? response : 'Non trovo questo prodotto.');
       } else if (parsed.intent === 'shopping-add') { await addShoppingItem(parsed.product, parsed.quantity); await refresh(); notify(`${parsed.product} aggiunto alla lista.`); }
       else if (parsed.intent === 'shopping-list') { setTab('shopping'); const response = suggestions.length ? `Ci sono ${suggestions.length} prodotti da comprare.` : 'La lista è sotto controllo.'; notify(response, 'info'); speakItalian(response); }
       else if (parsed.intent === 'expiring') { setTab('expiry'); const response = `${activeProducts.filter((product) => daysUntil(getProductExpiry(product)) <= settings.expiryNoticeDays).length} prodotti richiedono attenzione.`; notify(response, 'info'); speakItalian(response); }
