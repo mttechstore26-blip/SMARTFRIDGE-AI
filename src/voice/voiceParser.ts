@@ -51,7 +51,10 @@ export function parseCommand(input:string):ParsedCommand {
   if (/cosa devo comprare|lista della spesa|lista spesa/.test(text)) return {intent:'shopping-list'};
   if (/quali prodotti.*scad|in scadenza|stanno per scadere/.test(text)) return {intent:'expiring'};
   const query=text.match(/^(?:quanto|quanta|quante|quanti)\s+(.+?)(?:\s+(?:è rimasto|sono rimasti|sono rimaste|abbiamo|rimane))?\??$/);
-  if (query) return {intent:'query',product:canonicalVoiceProduct(clean(query[1]))};
+  if (query) {
+    const named = clean(query[1]).replace(/\s+(?:ci sono|ne abbiamo|abbiamo|sono rimasti|sono rimaste|sono rimasto|sono rimasta|è rimasto|e rimasto|rimane)\s*$/,'').trim();
+    return {intent:'query',product:canonicalVoiceProduct(named)};
+  }
   const prefixes: { regex:RegExp; intent:'add'|'remove'|'shopping-add' }[] = [
     {regex:/^(?:aggiungi alla lista|metti nella lista|segna da comprare|compra)\s+/,intent:'shopping-add'},
     {regex:/^(?:aggiungi|metti|inserisci|ho comprato|ho acquistato|abbiamo comprato|abbiamo acquistato|ho portato a casa)\s+/,intent:'add'},
