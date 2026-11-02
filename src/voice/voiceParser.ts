@@ -13,7 +13,7 @@ export function canonicalVoiceProduct(value: string): string {
     'candelpingui', 'candelpingwi', 'candelpinwi',
     'kandelpingui', 'kandelpinwi', 'chinderpingui'
   ]);
-  if (kinderPinguiVariants.has(cleaned)) return 'Kinder Pingui';
+  if (kinderPinguiVariants.has(cleaned)) return 'kinder pingui';
   return value.trim();
 }
 export function productTokens(value: string): string[] {
