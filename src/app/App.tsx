@@ -164,6 +164,10 @@ export default function App() {
         const product = found.product;
         if (!product) {
           if (parsed.intent === 'add' && !demoMode) {
+            if (!window.confirm(`Non trovo “${parsed.product}” nell’inventario. Vuoi creare un NUOVO prodotto con questo nome e aggiungere ${parsed.quantity} pezzi? Se il nome è stato trascritto male, premi Annulla.`)) {
+              notify('Aggiunta annullata. Riprova pronunciando il nome del prodotto.', 'info');
+              return;
+            }
             const saved = await createProduct({ name: parsed.product, category: categoryFromName(parsed.product), quantity: parsed.quantity, unit: 'pezzi', minQuantity: 1, targetQuantity: parsed.quantity + 1 });
             rememberPersonalProduct(saved);
             await refresh();
