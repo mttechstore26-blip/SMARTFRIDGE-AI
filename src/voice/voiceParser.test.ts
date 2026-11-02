@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseCommand } from './voiceParser';
+import { parseCommand, findVoiceProduct } from './voiceParser';
 
 describe('natural voice inventory commands', () => {
   it('adds purchased items to inventory, not the shopping list', () => {
@@ -12,6 +12,11 @@ describe('natural voice inventory commands', () => {
   });
   it('preserves shopping-list commands', () => {
     expect(parseCommand('Compra due yogurt')).toEqual({ intent: 'shopping-add', quantity: 2, product: 'yogurt' });
+  });
+  it('corrects Whisper Base chinder bueno without changing existing products', () => {
+    expect(parseCommand('Quanti chinder bueno ci sono?')).toEqual({ intent: 'query', product: 'kinder bueno' });
+    expect(parseCommand('Aggiungi un chinder bueno')).toEqual({ intent: 'add', quantity: 1, product: 'kinder bueno' });
+    expect(findVoiceProduct('chinder bueno', [{ name: 'Kinder Bueno' }]).product?.name).toBe('Kinder Bueno');
   });
   it('preserves old inventory commands', () => {
     expect(parseCommand('Aggiungi due Kinder Pingui')).toEqual({ intent: 'add', quantity: 2, product: 'kinder pingui' });
