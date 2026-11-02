@@ -50,9 +50,13 @@ export function parseCommand(input:string):ParsedCommand {
   const text=normalize(input).replace(/^ehi frigo[,:]?\s*/,'').replace(/^(?:per favore|puoi)\s+/,'').trim();
   if (/cosa devo comprare|lista della spesa|lista spesa/.test(text)) return {intent:'shopping-list'};
   if (/quali prodotti.*scad|in scadenza|stanno per scadere/.test(text)) return {intent:'expiring'};
-  const query=text.match(/^(?:quanto|quanta|quante|quanti)\s+(.+?)(?:\s+(?:è rimasto|sono rimasti|sono rimaste|abbiamo|rimane))?\??$/);
+  const query=text.match(/^(?:quanto|quanta|quante|quanti)\s+(.+)$/);
   if (query) {
-    const named = clean(query[1]).replace(/\s+(?:ci sono|ne abbiamo|abbiamo|sono rimasti|sono rimaste|sono rimasto|sono rimasta|è rimasto|e rimasto|rimane)\s*$/,'').trim();
+    // Rimuoviamo prima la domanda conclusiva: "Quanti Kinder Bueno ci sono?"
+    // deve cercare soltanto "Kinder Bueno", anche con punteggiatura e varianti.
+    const named = clean(query[1])
+      .replace(/\s+(?:ci sono|ce ne sono|ne abbiamo|abbiamo|sono rimasti|sono rimaste|sono rimasto|sono rimasta|è rimasto|e rimasto|rimane)\s*$/, '')
+      .trim();
     return {intent:'query',product:canonicalVoiceProduct(named)};
   }
   const prefixes: { regex:RegExp; intent:'add'|'remove'|'shopping-add' }[] = [
