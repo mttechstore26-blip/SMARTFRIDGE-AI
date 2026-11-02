@@ -14,6 +14,8 @@ export function canonicalVoiceProduct(value: string): string {
     'kandelpingui', 'kandelpinwi', 'chinderpingui'
   ]);
   if (kinderPinguiVariants.has(cleaned)) return 'kinder pingui';
+  // Whisper Base puo riconoscere chinder bueno anziche kinder bueno.
+  if (['chinderbueno', 'kinderbueno', 'kanderbueno'].includes(cleaned)) return 'kinder bueno';
   return value.trim();
 }
 export function productTokens(value: string): string[] {
