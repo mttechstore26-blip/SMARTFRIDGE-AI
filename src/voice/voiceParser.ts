@@ -6,8 +6,14 @@ const singular: Record<string,string> = { succhi:'succo', yogurt:'yogurt', uova:
 // Varianti fonetiche osservate con Whisper tiny: correggiamo solo nomi noti,
 // senza modificare arbitrariamente i nomi di altri prodotti.
 export function canonicalVoiceProduct(value: string): string {
-  const cleaned = normalize(value).normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').trim();
-  if (/^(?:candel|kandel|kinder|chinder)\\s+(?:pinwi|pingwi|pingui|pinguì|pinguino)$/.test(cleaned)) return 'Kinder Pingui';
+  const cleaned = normalize(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  // Il motore vocale può unire nome e marca in una sola parola.
+  const kinderPinguiVariants = new Set([
+    'kinderpingui', 'kinderpingwi', 'kinderpinwi',
+    'candelpingui', 'candelpingwi', 'candelpinwi',
+    'kandelpingui', 'kandelpinwi', 'chinderpingui'
+  ]);
+  if (kinderPinguiVariants.has(cleaned)) return 'Kinder Pingui';
   return value.trim();
 }
 export function productTokens(value: string): string[] {
