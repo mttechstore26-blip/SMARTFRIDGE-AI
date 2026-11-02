@@ -27,8 +27,12 @@ function fingerprint(payload: BackupPayload): string {
 
 export function getSyncConfig(): SyncConfig | null {
   try {
-    const value = sessionStorage.getItem(KEY);
-    return value ? JSON.parse(value) as SyncConfig : null;
+    const value = localStorage.getItem(KEY) ?? sessionStorage.getItem(KEY);
+    if (!value) return null;
+    const config = JSON.parse(value) as SyncConfig;
+    // Migra una configurazione esistente dalla sessione alla memoria persistente.
+    if (!localStorage.getItem(KEY)) localStorage.setItem(KEY, value);
+    return config;
   } catch { return null; }
 }
 export function isAutoSyncEnabled(): boolean {
@@ -43,7 +47,7 @@ export function configureSync(endpoint: string, token: string) {
   const previous = getSyncConfig();
   const normalized = url.origin + url.pathname.replace(/\/$/, '');
   const config: SyncConfig = { endpoint: normalized, token: token.trim(), revision: previous?.endpoint === normalized && previous.token === token.trim() ? previous.revision : 0 };
-  sessionStorage.setItem(KEY, JSON.stringify(config));
+  localStorage.setItem(KEY, JSON.stringify(config));
   baseline = readBaseline(config);
 }
 async function request(config: SyncConfig, method: 'GET' | 'PUT', body?: unknown) {
@@ -67,7 +71,7 @@ export async function uploadSnapshot() {
     if (remote.revision !== config.revision) throw new Error('Il server contiene una versione diversa. Scarica prima un backup e verifica i dati.');
     const payload = await createBackup();
     const result = await request(config, 'PUT', { revision: config.revision, payload });
-    sessionStorage.setItem(KEY, JSON.stringify({ ...config, revision: result.revision }));
+    localStorage.setItem(KEY, JSON.stringify({ ...config, revision: result.revision }));
     storeBaseline(config, fingerprint(payload));
   } finally { busy = false; }
 }
@@ -80,7 +84,7 @@ export async function downloadSnapshot() {
     const remote = await request(config, 'GET');
     if (!remote.payload || !validateBackup(remote.payload)) throw new Error('Il server non contiene ancora un backup valido.');
     await restoreBackup(remote.payload);
-    sessionStorage.setItem(KEY, JSON.stringify({ ...config, revision: remote.revision }));
+    localStorage.setItem(KEY, JSON.stringify({ ...config, revision: remote.revision }));
     storeBaseline(config, fingerprint(remote.payload));
   } finally { busy = false; }
 }
@@ -112,7 +116,7 @@ export async function autoSyncOnce(): Promise<AutoSyncResult> {
         throw new Error('Inventari diversi: scegli manualmente Invia o Scarica dopo aver esportato un backup.');
       }
       storeBaseline(config, localHash);
-      sessionStorage.setItem(KEY, JSON.stringify({ ...config, revision: remote.revision }));
+      localStorage.setItem(KEY, JSON.stringify({ ...config, revision: remote.revision }));
       return 'inizializzato';
     }
     const localChanged = localHash !== baseline;
@@ -124,16 +128,16 @@ export async function autoSyncOnce(): Promise<AutoSyncResult> {
       if (localChanged) throw new Error('Modifiche concorrenti. Sincronizzazione sospesa.');
       await restoreBackup(remote.payload);
       storeBaseline(config, remoteHash);
-      sessionStorage.setItem(KEY, JSON.stringify({ ...config, revision: remote.revision }));
+      localStorage.setItem(KEY, JSON.stringify({ ...config, revision: remote.revision }));
       return 'aggiornato';
     }
     if (localChanged) {
       const result = await request(config, 'PUT', { revision: remote.revision, payload: local });
       storeBaseline(config, localHash);
-      sessionStorage.setItem(KEY, JSON.stringify({ ...config, revision: result.revision }));
+      localStorage.setItem(KEY, JSON.stringify({ ...config, revision: result.revision }));
       return 'inviato';
     }
-    if (config.revision !== remote.revision) sessionStorage.setItem(KEY, JSON.stringify({ ...config, revision: remote.revision }));
+    if (config.revision !== remote.revision) localStorage.setItem(KEY, JSON.stringify({ ...config, revision: remote.revision }));
     return 'nessuna-modifica';
   } finally { busy = false; }
 }
